@@ -1,0 +1,9 @@
+fastapi
+pydantic
+uvicorn[standard]
+selenium
+requests
+SQLAlchemy>=2.0
+python-dotenv
+rq>=1.15.0
+redis>=4.5.0

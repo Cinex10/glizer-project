@@ -1,0 +1,152 @@
+version: '3.8'
+
+services:
+  # Redis service for RQ job queue
+  redis:
+    image: redis:7-alpine
+    container_name: yalla_ludo_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - yalla_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Main FastAPI application
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: yalla_ludo_api
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - ./data:/app/data  # For SQLite database persistence
+    environment:
+      - DATABASE_URL=sqlite:///./data/transactions.db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - REDIS_PASSWORD=
+      - BOT_TOKEN=${BOT_TOKEN:-}
+      - GLIZER_TOKEN=${GLIZER_TOKEN:-}
+      - GLIZER_WEBHOOK_URL=${GLIZER_WEBHOOK_URL:-}
+      - PERIOD_CHECKING_SECONDS=${PERIOD_CHECKING_SECONDS:-10}
+      - MAX_RETRIES=${MAX_RETRIES:-3}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - yalla_network
+    restart: unless-stopped
+    command: python src/main.py
+
+  # Webhook service
+  webhook:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: yalla_ludo_webhook
+    ports:
+      - "8001:8001"
+    volumes:
+      - .:/app
+    environment:
+      - DATABASE_URL=sqlite:///./data/transactions.db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - REDIS_PASSWORD=
+      - BOT_TOKEN=${BOT_TOKEN:-}
+      - GLIZER_TOKEN=${GLIZER_TOKEN:-}
+      - GLIZER_WEBHOOK_URL=${GLIZER_WEBHOOK_URL:-}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - yalla_network
+    restart: unless-stopped
+    command: python webhook.py
+
+  # RQ Worker for background job processing
+  worker1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: yalla_ludo_worker1
+    volumes:
+      - .:/app
+      - ./data:/app/data
+    environment:
+      - DATABASE_URL=sqlite:///./data/transactions.db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - REDIS_PASSWORD=
+      - BOT_TOKEN=${BOT_TOKEN:-}
+      - GLIZER_TOKEN=${GLIZER_TOKEN:-}
+      - GLIZER_WEBHOOK_URL=${GLIZER_WEBHOOK_URL:-}
+      - MAX_RETRIES=${MAX_RETRIES:-3}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - yalla_network
+    restart: unless-stopped
+    command: python worker.py
+
+  # Additional worker for scaling (optional)
+  worker2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: yalla_ludo_worker2
+    volumes:
+      - .:/app
+      - ./data:/app/data
+    environment:
+      - DATABASE_URL=sqlite:///./data/transactions.db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - REDIS_PASSWORD=
+      - BOT_TOKEN=${BOT_TOKEN:-}
+      - GLIZER_TOKEN=${GLIZER_TOKEN:-}
+      - GLIZER_WEBHOOK_URL=${GLIZER_WEBHOOK_URL:-}
+      - MAX_RETRIES=${MAX_RETRIES:-3}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - yalla_network
+    restart: unless-stopped
+    command: python worker.py
+
+  # Optional: RQ Dashboard for monitoring jobs
+  rq-dashboard:
+    image: eoranged/rq-dashboard
+    container_name: yalla_ludo_rq_dashboard
+    ports:
+      - "9181:9181"
+    environment:
+      - RQ_DASHBOARD_REDIS_URL=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - yalla_network
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  app_data:
+
+networks:
+  yalla_network:
+    driver: bridge 
