@@ -3,6 +3,7 @@ version: '3.8'
 services:
   # Redis service for RQ job queue
   redis:
+    platform: linux/amd64
     image: redis:7-alpine
     container_name: yalla_ludo_redis
     ports:
@@ -19,6 +20,7 @@ services:
 
   # Main FastAPI application
   api:
+    platform: linux/amd64
     build:
       context: .
       dockerfile: Dockerfile
@@ -28,17 +30,10 @@ services:
     volumes:
       - .:/app
       - ./data:/app/data  # For SQLite database persistence
+    env_file:
+      - .env
     environment:
       - DATABASE_URL=sqlite:///./data/transactions.db
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_DB=0
-      - REDIS_PASSWORD=
-      - BOT_TOKEN=${BOT_TOKEN:-}
-      - GLIZER_TOKEN=${GLIZER_TOKEN:-}
-      - GLIZER_WEBHOOK_URL=${GLIZER_WEBHOOK_URL:-}
-      - PERIOD_CHECKING_SECONDS=${PERIOD_CHECKING_SECONDS:-10}
-      - MAX_RETRIES=${MAX_RETRIES:-3}
     depends_on:
       redis:
         condition: service_healthy
@@ -49,6 +44,7 @@ services:
 
   # Webhook service
   webhook:
+    platform: linux/amd64
     build:
       context: .
       dockerfile: Dockerfile
@@ -57,15 +53,8 @@ services:
       - "8001:8001"
     volumes:
       - .:/app
-    environment:
-      - DATABASE_URL=sqlite:///./data/transactions.db
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_DB=0
-      - REDIS_PASSWORD=
-      - BOT_TOKEN=${BOT_TOKEN:-}
-      - GLIZER_TOKEN=${GLIZER_TOKEN:-}
-      - GLIZER_WEBHOOK_URL=${GLIZER_WEBHOOK_URL:-}
+    env_file:
+      - .env
     depends_on:
       redis:
         condition: service_healthy
@@ -76,6 +65,7 @@ services:
 
   # RQ Worker for background job processing
   worker1:
+    platform: linux/amd64
     build:
       context: .
       dockerfile: Dockerfile
@@ -83,16 +73,8 @@ services:
     volumes:
       - .:/app
       - ./data:/app/data
-    environment:
-      - DATABASE_URL=sqlite:///./data/transactions.db
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_DB=0
-      - REDIS_PASSWORD=
-      - BOT_TOKEN=${BOT_TOKEN:-}
-      - GLIZER_TOKEN=${GLIZER_TOKEN:-}
-      - GLIZER_WEBHOOK_URL=${GLIZER_WEBHOOK_URL:-}
-      - MAX_RETRIES=${MAX_RETRIES:-3}
+    env_file:
+      - .env
     depends_on:
       redis:
         condition: service_healthy
@@ -103,6 +85,7 @@ services:
 
   # Additional worker for scaling (optional)
   worker2:
+    platform: linux/amd64
     build:
       context: .
       dockerfile: Dockerfile
@@ -110,16 +93,8 @@ services:
     volumes:
       - .:/app
       - ./data:/app/data
-    environment:
-      - DATABASE_URL=sqlite:///./data/transactions.db
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_DB=0
-      - REDIS_PASSWORD=
-      - BOT_TOKEN=${BOT_TOKEN:-}
-      - GLIZER_TOKEN=${GLIZER_TOKEN:-}
-      - GLIZER_WEBHOOK_URL=${GLIZER_WEBHOOK_URL:-}
-      - MAX_RETRIES=${MAX_RETRIES:-3}
+    env_file:
+      - .env
     depends_on:
       redis:
         condition: service_healthy
@@ -134,8 +109,8 @@ services:
     container_name: yalla_ludo_rq_dashboard
     ports:
       - "9181:9181"
-    environment:
-      - RQ_DASHBOARD_REDIS_URL=redis://redis:6379/0
+    env_file:
+      - .env
     depends_on:
       redis:
         condition: service_healthy
