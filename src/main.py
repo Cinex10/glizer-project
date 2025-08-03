@@ -16,21 +16,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-# async def periodic_transaction_checker():
-#     period_checking_seconds = int(os.getenv("PERIOD_CHECKING_SECONDS", 10))
-    
-#     """Periodically check for pending transactions and resume them."""
-#     while True:
-#         try:
-#             logger.info("Checking for pending transactions to resume...")
-#             resume_pending_transactions()
-#         except Exception as e:
-#             logger.error(f"Error in periodic transaction checker: {str(e)}")
-        
-#         # Wait for configured period before checking again
-#         await asyncio.sleep(period_checking_seconds)
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Handle application startup and shutdown."""
