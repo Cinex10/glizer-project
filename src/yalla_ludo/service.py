@@ -6,26 +6,42 @@ from selenium.webdriver.chrome.options import Options
 import time
 import random
 
-def setup_undetectable_chrome():
-    """Configure Chrome to be undetectable"""
+def setup_undetectable_chrome(headless: bool = True):
+    """Configure Chrome to be as undetectable as possible.
+
+    Args:
+        headless (bool): Run browser in headless mode (recommended for servers/containers).
+
+    Returns:
+        selenium.webdriver.Chrome: Configured Chrome driver.
+    """
+    import tempfile  # Local import so that the module is only needed when the function is called
+
     options = Options()
-    
+
+    # Headless mode to avoid opening a visible window and to prevent profile-lock issues
+    if headless:
+        # The "new" headless mode is preferred for Chrome >= 109, but the classic flag
+        # is still accepted by older versions – passing both does not hurt.
+        options.add_argument("--headless=new")
+        options.add_argument("--window-size=1920,1080")
+
     # Disable automated browser notifications
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    options.add_experimental_option('useAutomationExtension', False)
-    
+    options.add_experimental_option("useAutomationExtension", False)
+
     # Realistic User-Agent
     options.add_argument('--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
     
     # Disable detection features
-    options.add_argument('--disable-blink-features=AutomationControlled')
-    options.add_argument('--disable-extensions')
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-infobars')
-    options.add_argument('--disable-dev-shm-usage')
-    options.add_argument('--disable-browser-side-navigation')
-    options.add_argument('--disable-gpu')
-    
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("--disable-extensions")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-infobars")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-browser-side-navigation")
+    options.add_argument("--disable-gpu")
+
     # Simulate a regular browser
     options.add_argument('--lang=fr-FR')
     options.add_argument('--disable-web-security')
