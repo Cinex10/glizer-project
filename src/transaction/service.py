@@ -1,12 +1,13 @@
 import uuid
 import json
-import logging
 import os
 from sqlalchemy.orm import Session
 from rq import Retry
 
-from yalla_ludo.schema import YallaLoadRequest
-from yalla_ludo.service import yalla_pay_recharge
+from logging_config import get_logger
+
+from pubg.schema import PubgLoadRequest
+from pubg.service import process_pubg_recharge
 from .database import SessionLocal, init_db
 from .models import Transaction
 from .schema import TransactionStatusResponse, TransactionIDResponse, TransactionStatus
@@ -14,7 +15,7 @@ from .utils import notify_glizer
 from .worker import get_queue
 
 # Setup logging
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Ensure tables are created at import time
 init_db()
@@ -80,7 +81,7 @@ def cleanup_orphaned_transactions():
 # RQ Job functions
 # ---------------------------------------------------------------------------
 
-def process_yalla_load_job(tx_id: str, order_payload: dict):
+def process_pubg_load_job(tx_id: str, order_payload: dict):
     """RQ job function to process Yalla load transaction."""
     try:
         # Validate input parameters
@@ -90,14 +91,14 @@ def process_yalla_load_job(tx_id: str, order_payload: dict):
         logger.info(f"Processing Yalla load transaction {tx_id}")
         
         # Parse the payload as YallaLoadRequest
-        yalla_request = YallaLoadRequest(**order_payload)
+        pubg_request = PubgLoadRequest(**order_payload)
         
         # Run the YallaPay recharge flow
-        succeeded = yalla_pay_recharge(
-            amount=yalla_request.amount,
-            itemType=yalla_request.itemType,
-            playerId=yalla_request.playerId,
-            pinCode=yalla_request.pinCode,
+        succeeded = process_pubg_recharge(
+            emailAddress=pubg_request.email,
+            password=pubg_request.password,
+            playerId=pubg_request.playerId,
+            redeemCodes=pubg_request.redeemCodes,
         )
 
         if succeeded:
@@ -124,8 +125,8 @@ def on_job_failure(job, connection, type, value, traceback):
 def process_transaction_by_type_job(tx_id: str, order_type: str, order_payload: dict):
     """RQ job function to process a transaction based on its order type."""
     try:
-        if order_type == "yalla_ludo":
-            process_yalla_load_job(tx_id, order_payload)
+        if order_type == "pubg":
+            process_pubg_load_job(tx_id, order_payload)
         else:
             logger.error(f"Unknown order type: {order_type} for transaction {tx_id}")
             update_status(tx_id, "error", notify=True)
@@ -175,13 +176,13 @@ def clean_payload(payload):
         except Exception:
             return "<non-serializable object>"
 
-def create_yalla_transaction(body: YallaLoadRequest) -> TransactionIDResponse:
+def create_pubg_transaction(body: PubgLoadRequest) -> TransactionIDResponse:
     """Create a new Yalla transaction and enqueue its processing."""
     tx_id = str(uuid.uuid4())
     
     # Store the order payload as JSON
     order_payload = body.model_dump()
-    order_type = "yalla_ludo"
+    order_type = "pubg"
     max_retries = _get_max_retries()
 
     # Validate payload can be serialized properly
@@ -203,9 +204,9 @@ def create_yalla_transaction(body: YallaLoadRequest) -> TransactionIDResponse:
     try:
         queue = get_queue()
         retry = Retry(max=max_retries)
-        
+        # Enqueue the job in the background queue
         job = queue.enqueue(
-            process_yalla_load_job,
+            process_pubg_load_job,
             tx_id,
             clean_payload(validated_payload),
             retry=retry,

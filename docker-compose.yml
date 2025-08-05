@@ -64,32 +64,12 @@ services:
     command: python webhook.py
 
   # RQ Worker for background job processing
-  worker1:
+  worker:
     platform: linux/amd64
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: yalla_ludo_worker1
-    volumes:
-      - .:/app
-      - ./data:/app/data
-    env_file:
-      - .env
-    depends_on:
-      redis:
-        condition: service_healthy
-    networks:
-      - yalla_network
-    restart: unless-stopped
-    command: python worker.py
-
-  # Additional worker for scaling (optional)
-  worker2:
-    platform: linux/amd64
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: yalla_ludo_worker2
+    container_name: yalla_ludo_worker
     volumes:
       - .:/app
       - ./data:/app/data
@@ -104,19 +84,19 @@ services:
     command: python worker.py
 
   # Optional: RQ Dashboard for monitoring jobs
-  rq-dashboard:
-    image: eoranged/rq-dashboard
-    container_name: yalla_ludo_rq_dashboard
-    ports:
-      - "9181:9181"
-    env_file:
-      - .env
-    depends_on:
-      redis:
-        condition: service_healthy
-    networks:
-      - yalla_network
-    restart: unless-stopped
+  # rq-dashboard:
+  #   image: eoranged/rq-dashboard
+  #   container_name: yalla_ludo_rq_dashboard
+  #   ports:
+  #     - "9181:9181"
+  #   env_file:
+  #     - .env
+  #   depends_on:
+  #     redis:
+  #       condition: service_healthy
+  #   networks:
+  #     - yalla_network
+  #   restart: unless-stopped
 
 volumes:
   redis_data:

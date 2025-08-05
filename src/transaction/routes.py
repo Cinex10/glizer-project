@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Header, HTTPException
 
-from yalla_ludo.schema import YallaLoadRequest
+from pubg.schema import PubgLoadRequest
 
 from .schema import TransactionIDResponse, TransactionStatusResponse
 from .utils import check_bot_token
@@ -11,13 +11,13 @@ router = APIRouter(prefix="/transaction")
 
 @router.post("/create", response_model=TransactionIDResponse)
 async def create_transaction(
-    yalla_body: YallaLoadRequest,
+    pubg_body: PubgLoadRequest,
     token: str = Header(...),
 ):
     """Create a new transaction. Currently supports only Yalla load."""
     check_bot_token(token)
 
-    return service.create_yalla_transaction(yalla_body)
+    return service.create_pubg_transaction(pubg_body)
 
 
 @router.get("/{transaction_id}", response_model=TransactionStatusResponse)

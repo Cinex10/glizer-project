@@ -1,11 +1,11 @@
 import os
-import logging
 from redis import Redis
 from rq import Queue, Worker
-from rq.serializers import JSONSerializer
+
+from logging_config import get_logger
 
 # Setup logging
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Redis connection configuration
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
@@ -64,11 +64,18 @@ redis_conn_rq = create_redis_connection_for_rq()
 redis_conn_general = create_redis_connection_general()
 
 # Create RQ queue with the binary-compatible Redis connection
-# Use JSONSerializer for payload but allow RQ to handle compression
+# Use default Pickle serializer to ensure compatibility between producer and worker
+# If you really need JSON serialization, you must upgrade RQ to >=1.15 and pass
+# the same serializer object to *both* queue *and* worker at **run time**.
 transaction_queue = Queue(
-    "transactions", 
-    connection=redis_conn_rq,  # Use binary connection for RQ
-    serializer=JSONSerializer
+    "transactions",
+    connection=redis_conn_rq  # Use binary connection for RQ
+)
+
+# Maintenance queue for scheduled jobs (e.g., user-data cleanup)
+maintenance_queue = Queue(
+    "maintenance",
+    connection=redis_conn_rq
 )
 
 
@@ -93,12 +100,12 @@ def start_worker():
     try:
         # Use the RQ-specific Redis connection and JSONSerializer
         worker = Worker(
-            [transaction_queue], 
-            connection=redis_conn_rq,
-            serializer=JSONSerializer
+            [transaction_queue, maintenance_queue],
+            connection=redis_conn_rq
         )
-        logger.info(f"Worker initialized with queue: {transaction_queue.name}")
-        worker.work()
+        logger.info(f"Worker initialized with queues: {transaction_queue.name}, {maintenance_queue.name}")
+        # Enable scheduler so that scheduled and repeating jobs are processed
+        worker.work(with_scheduler=True)
     except Exception as e:
         logger.error(f"Worker failed: {str(e)}")
         raise

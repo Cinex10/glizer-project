@@ -212,6 +212,7 @@ rq-dashboard.log
 # Chrome/Chromium user data
 chrome_user_data/
 user_data_dir/
+user-data-*/
 
 # Screenshots and downloads from automation
 screenshots/
