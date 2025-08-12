@@ -8,6 +8,6 @@ class Transaction(Base):
 
     id = Column(String, primary_key=True, index=True)
     status = Column(String, index=True)
-    order_type = Column(String, index=True)  # e.g., "yalla_ludo"
+    order_type = Column(String, index=True)  # e.g., "pubg"
     order_payload = Column(Text)  # JSON string of the order data
     remaining_retries = Column(Integer, default=3)  # Number of retries left 

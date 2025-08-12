@@ -36,7 +36,7 @@ header:
 token:string
 
 body:
-[yalla load]
+[pubg load]
 itemType:diamonds|golds
 amount:number
 pinCode:string

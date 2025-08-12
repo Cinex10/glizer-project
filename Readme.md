@@ -1,6 +1,6 @@
-# Yalla Pay Recharge Bot
+# Pubg Pay Recharge Bot
 
-Automated bot for YallaPay recharges with REST API, Redis Queue background processing, and webhook support.
+Automated bot for PubgPay recharges with REST API, Redis Queue background processing, and webhook support.
 
 ## 🚀 Quick Start with Docker (Recommended)
 
@@ -12,7 +12,7 @@ Automated bot for YallaPay recharges with REST API, Redis Queue background proce
 ```bash
 # Clone the project
 git clone <your-repo>
-cd yalla_ludo
+cd pubg
 
 # Copy environment configuration
 cp env.example .env
@@ -122,7 +122,7 @@ rq-dashboard
 ## 📁 Project Structure
 
 ```
-yalla_ludo/
+pubg/
 ├── src/
 │   ├── main.py              # Main FastAPI application
 │   ├── database.py          # Database configuration
@@ -132,7 +132,7 @@ yalla_ludo/
 │   │   ├── models.py        # Database models
 │   │   ├── worker.py        # RQ worker configuration
 │   │   └── utils.py         # Utility functions
-│   └── yalla_ludo/          # Yalla Ludo specific logic
+│   └── pubg/          # Pubg Ludo specific logic
 ├── webhook.py               # Webhook receiver
 ├── worker.py               # RQ worker startup script
 ├── docker-compose.yml      # Docker services configuration

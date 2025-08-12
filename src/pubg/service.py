@@ -1,4 +1,3 @@
-import pdb
 import random
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -13,6 +12,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 import random
 import logging
+import stat
 
 
 COOKIES_XPATH='/html[1]/body[1]/div[2]/div[1]/div[11]/div[3]/div[1]/div[1]/div[1]'
@@ -74,8 +74,11 @@ class PlayerSwitchError(Exception):
 
 class Browser:
     def __init__(self) -> None:
+        logger.info("init ##")
         url = os.getcwd()
         user_data = os.path.join(url, 'user-data')
+        os.makedirs(user_data, mode=0o700, exist_ok=True)
+        os.chmod(user_data, stat.S_IRWXU)
         options = Options()
         options.page_load_strategy = 'none'
         options.add_argument(f"--user-data-dir={user_data}")

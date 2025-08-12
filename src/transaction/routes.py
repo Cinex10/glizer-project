@@ -14,7 +14,7 @@ async def create_transaction(
     pubg_body: PubgLoadRequest,
     token: str = Header(...),
 ):
-    """Create a new transaction. Currently supports only Yalla load."""
+    """Create a new transaction. Currently supports only Pubg load."""
     check_bot_token(token)
 
     return service.create_pubg_transaction(pubg_body)

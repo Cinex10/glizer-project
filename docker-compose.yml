@@ -5,13 +5,13 @@ services:
   redis:
     platform: linux/amd64
     image: redis:7-alpine
-    container_name: yalla_ludo_redis
+    container_name: pubg_redis
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
     networks:
-      - yalla_network
+      - pubg_network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -24,7 +24,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: yalla_ludo_api
+    container_name: pubg_api
     ports:
       - "8000:8000"
     volumes:
@@ -38,9 +38,10 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - yalla_network
+      - pubg_network
     restart: unless-stopped
     command: python src/main.py
+    
 
   # Webhook service
   webhook:
@@ -48,7 +49,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: yalla_ludo_webhook
+    container_name: pubg_webhook
     ports:
       - "8001:8001"
     volumes:
@@ -59,7 +60,7 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - yalla_network
+      - pubg_network
     restart: unless-stopped
     command: python webhook.py
 
@@ -69,7 +70,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: yalla_ludo_worker
+    container_name: pubg_worker
     volumes:
       - .:/app
       - ./data:/app/data
@@ -79,29 +80,29 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - yalla_network
+      - pubg_network
     restart: unless-stopped
     command: python worker.py
 
   # Optional: RQ Dashboard for monitoring jobs
-  # rq-dashboard:
-  #   image: eoranged/rq-dashboard
-  #   container_name: yalla_ludo_rq_dashboard
-  #   ports:
-  #     - "9181:9181"
-  #   env_file:
-  #     - .env
-  #   depends_on:
-  #     redis:
-  #       condition: service_healthy
-  #   networks:
-  #     - yalla_network
-  #   restart: unless-stopped
+  rq-dashboard:
+    image: eoranged/rq-dashboard
+    container_name: pubg_rq_dashboard
+    ports:
+      - "9181:9181"
+    env_file:
+      - .env
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - pubg_network
+    restart: unless-stopped
 
 volumes:
   redis_data:
   app_data:
 
 networks:
-  yalla_network:
+  pubg_network:
     driver: bridge 

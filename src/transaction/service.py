@@ -82,18 +82,18 @@ def cleanup_orphaned_transactions():
 # ---------------------------------------------------------------------------
 
 def process_pubg_load_job(tx_id: str, order_payload: dict):
-    """RQ job function to process Yalla load transaction."""
+    """RQ job function to process Pubg load transaction."""
     try:
         # Validate input parameters
         if not isinstance(tx_id, str) or not isinstance(order_payload, dict):
             raise ValueError(f"Invalid job parameters: tx_id={type(tx_id)}, payload={type(order_payload)}")
         
-        logger.info(f"Processing Yalla load transaction {tx_id}")
+        logger.info(f"Processing Pubg load transaction {tx_id}")
         
-        # Parse the payload as YallaLoadRequest
+        # Parse the payload as PubgLoadRequest
         pubg_request = PubgLoadRequest(**order_payload)
         
-        # Run the YallaPay recharge flow
+        # Run the PubgPay recharge flow
         succeeded = process_pubg_recharge(
             emailAddress=pubg_request.email,
             password=pubg_request.password,
@@ -106,10 +106,10 @@ def process_pubg_load_job(tx_id: str, order_payload: dict):
             logger.info(f"Transaction {tx_id} completed successfully")
         else:
             # Let RQ handle the retry mechanism
-            raise Exception(f"YallaPay recharge failed for transaction {tx_id}")
+            raise Exception(f"PubgPay recharge failed for transaction {tx_id}")
             
     except Exception as e:
-        logger.error(f"Error processing Yalla load transaction {tx_id}: {str(e)}")
+        logger.error(f"Error processing Pubg load transaction {tx_id}: {str(e)}")
         # Mark as error only if this is the final attempt (RQ will handle this automatically)
         raise e
 
@@ -177,7 +177,7 @@ def clean_payload(payload):
             return "<non-serializable object>"
 
 def create_pubg_transaction(body: PubgLoadRequest) -> TransactionIDResponse:
-    """Create a new Yalla transaction and enqueue its processing."""
+    """Create a new Pubg transaction and enqueue its processing."""
     tx_id = str(uuid.uuid4())
     
     # Store the order payload as JSON
@@ -209,7 +209,7 @@ def create_pubg_transaction(body: PubgLoadRequest) -> TransactionIDResponse:
             process_pubg_load_job,
             tx_id,
             clean_payload(validated_payload),
-            retry=retry,
+            # retry=retry,
             on_failure=on_job_failure,
             job_timeout='10m'  # 10 minute timeout per job
         )
