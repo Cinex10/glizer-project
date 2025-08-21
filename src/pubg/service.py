@@ -84,7 +84,7 @@ class Browser:
         options.add_argument(f"--user-data-dir={user_data}")
         
         # Ubuntu server compatibility arguments
-        options.add_argument("--headless")  # Run in headless mode
+        # options.add_argument("--headless")  # Run in headless mode
         options.add_argument("--no-sandbox")  # Required for Docker/server environments
         options.add_argument("--disable-dev-shm-usage")  # Overcome limited resource problems
         options.add_argument("--disable-gpu")  # Disable GPU acceleration
