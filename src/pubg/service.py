@@ -90,7 +90,7 @@ class Browser:
         options.add_argument("--disable-gpu")  # Disable GPU acceleration
         options.add_argument("--remote-debugging-port=9222")  # Enable remote debugging
         options.add_argument("--window-size=1920,1080")  # Set window size for headless mode
-        options.add_argument("--display=:99")  # Use virtual display
+        # options.add_argument("--display=:99")  # Use virtual display
         
         # Keep maximized for non-headless environments (will be ignored in headless mode)
         options.add_argument("--start-maximized")
