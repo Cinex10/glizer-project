@@ -93,6 +93,10 @@ class Browser:
         # options.add_argument("--display=:99")  # Use virtual display
         options.add_argument("--disable-web-security")  # Disable web security for testing
         options.add_argument("--disable-features=VizDisplayCompositor")  # Fix rendering issues
+        options.add_argument("--lang=ar")  # Set language to Arabic
+        options.add_experimental_option("prefs", {
+            "intl.accept_languages": "ar,ar-SA,en-US,en"
+        })
         
         # Keep maximized for non-headless environments (will be ignored in headless mode)
         options.add_argument("--start-maximized")
