@@ -90,11 +90,16 @@ class Browser:
         options.add_argument("--disable-gpu")  # Disable GPU acceleration
         options.add_argument("--remote-debugging-port=9222")  # Enable remote debugging
         options.add_argument("--window-size=1920,1080")  # Set window size for headless mode
+        options.add_argument("--display=:99")  # Use virtual display
         
         # Keep maximized for non-headless environments (will be ignored in headless mode)
         options.add_argument("--start-maximized")
         
         self.driver = webdriver.Chrome(options=options)
+        
+        # Set timeouts to prevent hanging
+        self.driver.set_page_load_timeout(30)
+        self.driver.implicitly_wait(10)
         # self.driver = webdriver.Chrome(options=options)
     
     def safe_click(self, locator, delay=15):
@@ -107,7 +112,20 @@ class Browser:
             self.driver.execute_script("arguments[0].click();", element)
 
     def visit_page(self):
-        self.driver.get('https://www.midasbuy.com/midasbuy/sa/redeem/pubgm')
+        try:
+            print("Attempting to navigate to URL...")
+            self.driver.get('https://www.midasbuy.com/midasbuy/sa/redeem/pubgm')
+            print(f"Current URL after navigation: {self.driver.current_url}")
+            print(f"Page title: {self.driver.title}")
+            
+            # Wait for page to load
+            self.wait_for_page_load(timeout=30)
+            print("Page loaded successfully")
+            
+        except Exception as e:
+            print(f"Navigation failed: {str(e)}")
+            print(f"Current URL: {self.driver.current_url}")
+            raise Exception(f"Failed to navigate to page: {str(e)}")
         
         try:
             self.safe_click((By.XPATH, COOKIES_XPATH), delay=5)
