@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Redis service for RQ job queue
   redis:
@@ -86,6 +84,7 @@ services:
 
   # Optional: RQ Dashboard for monitoring jobs
   rq-dashboard:
+    platform: linux/amd64
     image: eoranged/rq-dashboard
     container_name: pubg_rq_dashboard
     ports:

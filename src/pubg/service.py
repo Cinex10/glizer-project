@@ -21,7 +21,7 @@ COOKIES_XPATH='/html[1]/body[1]/div[2]/div[1]/div[11]/div[3]/div[1]/div[1]/div[1
 DETECT_PAGE_LOADED_XPATH='//div[@class="Banner_title__dnHBH"]'
 SIGN_IN_BUTTON_SELECTOR='div.MobileNav_sign_in__qA2oK'
 SIGN_IN_BUTTON_SELECTOR2='div.Button_icon_text__C-ysi'
-SIGN_IN_BUTTON_XPATH_SELECTOR3='//*[@id="login-sdk-app"]/div[1]/div/div[3]/div[1]/div/div[2]/span'
+SIGN_IN_BUTTON_XPATH_SELECTOR3="//span[contains(text(),'تسجيل الدخول')]"
 
 IFRAME_XPATH='//iframe[contains(@src,"https://www.midasbuy.com/apps/login/home/sa")]'
 CONTINUE_SIGN_IN_BUTTON_XPATH="//div[@class='btn comfirm-btn']"
@@ -86,13 +86,15 @@ class Browser:
         # Ubuntu server compatibility arguments
         options.add_argument("--headless")  # Run in headless mode
         options.add_argument("--no-sandbox")  # Required for Docker/server environments
-        # options.add_argument("--disable-dev-shm-usage")  # Overcome limited resource problems
-        # options.add_argument("--disable-gpu")  # Disable GPU acceleration
-        # options.add_argument("--remote-debugging-port=9222")  # Enable remote debugging
+        options.add_argument("--disable-dev-shm-usage")  # Overcome limited resource problems
+        options.add_argument("--disable-gpu")  # Disable GPU acceleration
+        options.add_argument("--disable-extensions")  # Disable extensions
+        options.add_argument("--disable-plugins")  # Disable plugins
         options.add_argument("--window-size=1920,1080")  # Set window size for headless mode
-        # options.add_argument("--display=:99")  # Use virtual display
-        #options.add_argument("--disable-web-security")  # Disable web security for testing
-        #options.add_argument("--disable-features=VizDisplayCompositor")  # Fix rendering issues
+        options.add_argument("--disable-web-security")  # Disable web security for iframe issues
+        options.add_argument("--disable-features=VizDisplayCompositor")  # Fix rendering issues
+        options.add_argument("--disable-background-timer-throttling")  # Prevent iframe throttling
+        options.add_argument("--disable-renderer-backgrounding")  # Keep iframe rendering active
         options.add_argument("--lang=ar")  # Set language to Arabic
         options.add_experimental_option("prefs", {
             "intl.accept_languages": "ar,ar-SA,en-US,en"
@@ -101,7 +103,13 @@ class Browser:
         # Keep maximized for non-headless environments (will be ignored in headless mode)
         options.add_argument("--start-maximized")
         
-        self.driver = webdriver.Chrome(options=options)
+        try:
+            self.driver = webdriver.Chrome(options=options)
+            # Test the session immediately
+            self.driver.get("about:blank")
+        except Exception as e:
+            logger.error(f"Failed to initialize Chrome driver: {e}")
+            raise Exception(f"Browser initialization failed: {e}")
         
         # Set timeouts to prevent hanging
         self.driver.set_page_load_timeout(30)
@@ -117,27 +125,41 @@ class Browser:
         except Exception:
             self.driver.execute_script("arguments[0].click();", element)
 
-    def visit_page(self):
+    def is_session_valid(self):
+        """Check if the current browser session is valid"""
         try:
-            print("Attempting to navigate to URL...")
+            self.driver.current_url
+            return True
+        except:
+            return False
+    
+    def visit_page(self):
+        if not self.is_session_valid():
+            raise Exception("Browser session is invalid - driver may have crashed")
+        
+        try:
+            logger.info("Attempting to navigate to URL...")
             self.driver.get('https://www.midasbuy.com/midasbuy/sa/redeem/pubgm')
-            print(f"Current URL after navigation: {self.driver.current_url}")
-            print(f"Page title: {self.driver.title}")
+            logger.info(f"Current URL after navigation: {self.driver.current_url}")
+            logger.info(f"Page title: {self.driver.title}")
             
             # Wait for page to load
             self.wait_for_page_load(timeout=30)
-            print("Page loaded successfully")
+            logger.info("Page loaded successfully")
             
         except Exception as e:
-            print(f"Navigation failed: {str(e)}")
-            print(f"Current URL: {self.driver.current_url}")
+            logger.error(f"Navigation failed: {str(e)}")
+            try:
+                logger.info(f"Current URL: {self.driver.current_url}")
+            except:
+                logger.warning("Unable to get current URL - driver session may be invalid")
             raise Exception(f"Failed to navigate to page: {str(e)}")
         
         try:
             self.safe_click((By.XPATH, COOKIES_XPATH), delay=5)
-            print('Cookies accepted')
+            logger.info('Cookies accepted')
         except:
-            print(f"Cookies already accepted")
+            logger.info("Cookies already accepted")
         
         
     
@@ -150,25 +172,71 @@ class Browser:
             return True
 
     def sign_in(self, email_address, password):
-        print('Sign In')
+        logger.info('Sign In')
         self.wait_for_page_load()
 
-        print('Page Loaded')
+        logger.info('Page Loaded')
         status = self.driver.execute_script(f"document.querySelector('{SIGN_IN_BUTTON_SELECTOR}').click();return 'clicked login button'")
         time.sleep(random.uniform(1, 2.5))
 
         status = self.driver.execute_script(f"document.querySelector('{SIGN_IN_BUTTON_SELECTOR2}').click();return 'clicked login button'")
         
-        print(status)
+        logger.info(status)
 
-        iframe = WebDriverWait(self.driver, 15).until(
-            EC.presence_of_element_located((By.XPATH, IFRAME_XPATH))
-        )
-        print('iframe')
+        try:
+            iframe = WebDriverWait(self.driver, 15).until(
+                EC.presence_of_element_located((By.XPATH, IFRAME_XPATH))
+            )
+            logger.info('iframe found')
+            
+            # Log iframe properties for debugging
+            try:
+                is_displayed = iframe.is_displayed()
+                is_enabled = iframe.is_enabled()
+                size = iframe.size
+                logger.info(f'iframe - displayed: {is_displayed}, enabled: {is_enabled}, size: {size}')
+            except Exception as debug_e:
+                logger.warning(f'Failed to get iframe properties: {debug_e}')
+            
+            # Wait a bit more for iframe to be fully loaded
+            time.sleep(2)
+            
+            # Try switching to iframe regardless of display/enabled status
+            try:
+                self.driver.switch_to.frame(iframe)
+                logger.info('iframe switched successfully')
+                
+                # Validate we're actually in the iframe
+                try:
+                    WebDriverWait(self.driver, 5).until(
+                        EC.presence_of_element_located((By.TAG_NAME, "body"))
+                    )
+                    logger.info('iframe content accessible')
+                except:
+                    logger.warning("Failed to find body in iframe, trying by index")
+                    self.driver.switch_to.default_content()
+                    # Try switching by index as fallback
+                    self.driver.switch_to.frame(0)
+                    logger.info('switched to iframe by index')
+            except Exception as switch_e:
+                logger.error(f'Failed to switch to iframe: {switch_e}')
+                # Try switching by index as last resort
+                try:
+                    self.driver.switch_to.frame(0)
+                    logger.info('switched to iframe by index as fallback')
+                except Exception as index_e:
+                    logger.error(f'Failed to switch by index: {index_e}')
+                    raise Exception("All iframe switching methods failed")
+        except Exception as e:
+            logger.error(f"Iframe switching failed: {str(e)}")
+            # Ensure we're back to default content if iframe switch failed
+            try:
+                self.driver.switch_to.default_content()
+            except:
+                pass
+            raise
 
-        self.driver.switch_to.frame(iframe)
-
-        print('iframe switched')
+        logger.info('iframe switched')
         
         time.sleep(random.uniform(1, 2.5))
         
@@ -179,13 +247,13 @@ class Browser:
             EC.presence_of_element_located((By.XPATH, EMAIL_ADDRESS_FIELD_XPATH))
         )
         
-        print('email_address_field')
+        logger.info('email_address_field')
         
         if email_address_field.get_attribute('value') != email_address:
             self.clear_and_type(email_address_field, email_address)
-            print('email filled')
+            logger.info('email filled')
         else:
-            print('Email Address is already filled. Skipping the step.')
+            logger.info('Email Address is already filled. Skipping the step.')
         
         continue_button = WebDriverWait(self.driver, 20).until(
                     EC.presence_of_element_located((By.XPATH, CONTINUE_SIGN_IN_BUTTON_XPATH))
@@ -202,7 +270,7 @@ class Browser:
             # Fallback to JavaScript click
             self.driver.execute_script("arguments[0].click();", continue_button)
         
-        print('continue_button')
+        logger.info('continue_button')
 
         password_input_field = WebDriverWait(self.driver, 15).until(
             EC.presence_of_element_located((By.XPATH,PASSWORD_INPUT_FIELD_XPATH))
@@ -210,22 +278,63 @@ class Browser:
 
         self.clear_and_type(password_input_field, password)
         
-        print('password_input_field')
+        logger.info('password_input_field')
 
         self.driver.find_element(By.XPATH, FINAL_SIGN_IN_BUTTON_XPATH).click()
-        print("Arrive ")
+        logger.info("Arrive ")
         time.sleep(3)
-        passkey_button = WebDriverWait(self.driver, 20).until(
+        
+        # Try to handle different post-login scenarios
+        try:
+            # Check if we're already logged in successfully
+            self.driver.switch_to.default_content()
+            if self.is_signed_in():
+                logger.info("Already signed in successfully")
+                return
+                
+            # Switch back to iframe if still in login flow
+            self.driver.switch_to.frame(0)
+            
+            # Look for passkey button with shorter timeout
+            try:
+                passkey_button = WebDriverWait(self.driver, 10).until(
                     EC.presence_of_element_located((By.XPATH, '/html/body/div/div[1]/div/div[1]'))
                 )
-        
-        print('passkey_button')
-
-        self.driver.execute_script(
-                    'arguments[0].click()',
-                    passkey_button
-                )
-        print('passkey_button clicked')
+                logger.info('passkey_button found')
+                self.driver.execute_script('arguments[0].click()', passkey_button)
+                logger.info('passkey_button clicked')
+                
+            except TimeoutException:
+                logger.warning("Passkey button not found, checking for other elements")
+                
+                # Look for alternative completion indicators
+                alternative_selectors = [
+                    "//button[contains(text(), 'Continue')]",
+                    "//button[contains(text(), 'Skip')]", 
+                    "//div[contains(@class, 'success')]",
+                    "//div[contains(@class, 'complete')]"
+                ]
+                
+                found_alternative = False
+                for selector in alternative_selectors:
+                    try:
+                        element = WebDriverWait(self.driver, 2).until(
+                            EC.presence_of_element_located((By.XPATH, selector))
+                        )
+                        logger.info(f"Found alternative element: {selector}")
+                        element.click()
+                        found_alternative = True
+                        break
+                    except:
+                        continue
+                
+                if not found_alternative:
+                    logger.info("No post-login actions needed, checking login status")
+                    
+        except Exception as e:
+            logger.error(f"Post-login handling error: {str(e)}")
+            # Continue anyway as login might have succeeded
+        logger.info('passkey_button clicked')
 
     def get_current_player_id(self):
         original_element = WebDriverWait(self.driver, 10).until(
@@ -275,6 +384,9 @@ class Browser:
             logger.info("Player ID successfully changed") 
         except Exception as e:
             logger.error(f"Player switch failed: {str(e)}")
+            screenshot_file = "screenshots/Player switch failed.png"
+            self.driver.save_screenshot(screenshot_file)
+            logger.info(f"Screenshot saved as: {screenshot_file}")
             raise Exception("Invalid Player ID")
 
     def redeem_code(self, redeem_code):
@@ -315,7 +427,7 @@ class Browser:
                 # Handle submission
                 self.handle_redemption_submission()
                 
-                print('Redemption submitted')
+                logger.info('Redemption submitted')
             except Exception:
                 try:
                     ok_btn = WebDriverWait(self.driver, 4).until(
@@ -444,12 +556,16 @@ def process_pubg_recharge(emailAddress, password, playerId, redeemCodes):
         #
         #browser.implicitly_wait(10)
         is_logged_in = browser.is_logged_in()
-        print('is logged in ', is_logged_in)
+        logger.info(f'is logged in: {is_logged_in}')
         if not is_logged_in:
             browser.sign_in(email_address=emailAddress, password=password)
         
     except Exception as e:
-        print(f"Sign in error: {str(e)}")
+        logger.error(f"Sign in error: {str(e)}")
+        
+        screenshot_file = f"screenshots/screenshot_sign_in.png"
+        browser.driver.save_screenshot(screenshot_file)
+        logger.info(f"Screenshot saved as: {screenshot_file}")
         raise Exception("Failed to sign in")
 
     try:
@@ -464,7 +580,7 @@ def process_pubg_recharge(emailAddress, password, playerId, redeemCodes):
             finally:
                 continue
     except Exception as err:
-        print(f"Redeem code error: {code} ,{str(err)}")
+        logger.error(f"Redeem code error: {code}, {str(err)}")
         result[code] = str(err)
     finally:
         return result

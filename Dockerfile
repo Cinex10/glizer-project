@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 python:3.11-slim
+FROM python:3.11-slim
 
 # Set working directory
 WORKDIR /app
@@ -11,6 +11,11 @@ RUN apt-get update && apt-get install -y \
     curl \
     xvfb \
     fonts-liberation \
+    fonts-dejavu \
+    fontconfig \
+    fonts-noto \
+    fonts-noto-color-emoji \
+    fonts-noto-cjk \
     libasound2 \
     libatk-bridge2.0-0 \
     libdrm2 \
@@ -23,6 +28,15 @@ RUN apt-get update && apt-get install -y \
     libxshmfence1 \
     libglu1-mesa \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Arabic fonts manually
+RUN mkdir -p /usr/share/fonts/truetype/arabic \
+    && wget -q -O /usr/share/fonts/truetype/arabic/NotoSansArabic-Regular.ttf "https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansArabic/NotoSansArabic-Regular.ttf" \
+    && wget -q -O /usr/share/fonts/truetype/arabic/NotoSansArabic-Bold.ttf "https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansArabic/NotoSansArabic-Bold.ttf" \
+    && wget -q -O /tmp/amiri.zip "https://github.com/aliftype/amiri/releases/download/1.000/Amiri-1.000.zip" \
+    && unzip -j /tmp/amiri.zip "*.ttf" -d /usr/share/fonts/truetype/arabic/ \
+    && fc-cache -f -v \
+    && rm -rf /tmp/*.zip
 
 # Install Google Chrome directly
 # RUN wget -q -O google-chrome-stable_current_amd64.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \

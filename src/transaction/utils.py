@@ -1,6 +1,10 @@
 import os
 import requests
 from fastapi import HTTPException
+import logging
+import time
+
+logger = logging.getLogger(__name__)
 
 # Tokens/URLs configurable via environment variables
 BOT_TOKEN = os.getenv("BOT_TOKEN", "123456789")
@@ -34,5 +38,5 @@ def notify_glizer(transaction_id: str, status: str):
     try:
         requests.post(GLIZER_WEBHOOK_URL, json=payload, headers=headers, timeout=10)
     except requests.RequestException as exc:
-        # Log the error; in production use proper logging
-        print(f"Failed to notify Glizer: {exc}")
+        # Log the error
+        logger.error(f"Failed to notify Glizer: {exc}")
