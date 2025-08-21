@@ -83,8 +83,17 @@ class Browser:
         options.page_load_strategy = 'none'
         options.add_argument(f"--user-data-dir={user_data}")
         
-        # service = Service(f"{url}\\chromedriver.exe")
-        options.add_argument("--start-maximized")  # Start maximized
+        # Ubuntu server compatibility arguments
+        options.add_argument("--headless")  # Run in headless mode
+        options.add_argument("--no-sandbox")  # Required for Docker/server environments
+        options.add_argument("--disable-dev-shm-usage")  # Overcome limited resource problems
+        options.add_argument("--disable-gpu")  # Disable GPU acceleration
+        options.add_argument("--remote-debugging-port=9222")  # Enable remote debugging
+        options.add_argument("--window-size=1920,1080")  # Set window size for headless mode
+        
+        # Keep maximized for non-headless environments (will be ignored in headless mode)
+        options.add_argument("--start-maximized")
+        
         self.driver = webdriver.Chrome(options=options)
         # self.driver = webdriver.Chrome(options=options)
     
