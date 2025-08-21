@@ -413,6 +413,8 @@ def process_pubg_recharge(emailAddress, password, playerId, redeemCodes):
 
     browser = Browser()
 
+    result = {}
+    
     browser.visit_page()
     try:
         #
@@ -428,7 +430,6 @@ def process_pubg_recharge(emailAddress, password, playerId, redeemCodes):
 
     try:
         browser.switch_player_id(player_id=playerId)
-        result = {}
         for code in redeemCodes:
             try:
                 redeem_status = browser.redeem_code(redeem_code=code)
