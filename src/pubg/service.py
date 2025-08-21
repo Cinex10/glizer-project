@@ -80,7 +80,7 @@ class Browser:
         os.makedirs(user_data, mode=0o700, exist_ok=True)
         os.chmod(user_data, stat.S_IRWXU)
         options = Options()
-        options.page_load_strategy = 'none'
+        options.page_load_strategy = 'normal'  # Changed from 'none' to ensure page loads
         options.add_argument(f"--user-data-dir={user_data}")
         
         # Ubuntu server compatibility arguments
@@ -90,7 +90,9 @@ class Browser:
         options.add_argument("--disable-gpu")  # Disable GPU acceleration
         options.add_argument("--remote-debugging-port=9222")  # Enable remote debugging
         options.add_argument("--window-size=1920,1080")  # Set window size for headless mode
-        # options.add_argument("--display=:99")  # Use virtual display
+        options.add_argument("--display=:99")  # Use virtual display
+        options.add_argument("--disable-web-security")  # Disable web security for testing
+        options.add_argument("--disable-features=VizDisplayCompositor")  # Fix rendering issues
         
         # Keep maximized for non-headless environments (will be ignored in headless mode)
         options.add_argument("--start-maximized")
