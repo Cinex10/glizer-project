@@ -84,15 +84,15 @@ class Browser:
         options.add_argument(f"--user-data-dir={user_data}")
         
         # Ubuntu server compatibility arguments
-        # options.add_argument("--headless")  # Run in headless mode
+        options.add_argument("--headless")  # Run in headless mode
         options.add_argument("--no-sandbox")  # Required for Docker/server environments
-        options.add_argument("--disable-dev-shm-usage")  # Overcome limited resource problems
-        options.add_argument("--disable-gpu")  # Disable GPU acceleration
-        options.add_argument("--remote-debugging-port=9222")  # Enable remote debugging
+        # options.add_argument("--disable-dev-shm-usage")  # Overcome limited resource problems
+        # options.add_argument("--disable-gpu")  # Disable GPU acceleration
+        # options.add_argument("--remote-debugging-port=9222")  # Enable remote debugging
         options.add_argument("--window-size=1920,1080")  # Set window size for headless mode
         # options.add_argument("--display=:99")  # Use virtual display
-        options.add_argument("--disable-web-security")  # Disable web security for testing
-        options.add_argument("--disable-features=VizDisplayCompositor")  # Fix rendering issues
+        #options.add_argument("--disable-web-security")  # Disable web security for testing
+        #options.add_argument("--disable-features=VizDisplayCompositor")  # Fix rendering issues
         options.add_argument("--lang=ar")  # Set language to Arabic
         options.add_experimental_option("prefs", {
             "intl.accept_languages": "ar,ar-SA,en-US,en"
