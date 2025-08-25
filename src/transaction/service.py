@@ -100,13 +100,13 @@ def process_pubg_load_job(tx_id: str, order_payload: dict):
             playerId=pubg_request.playerId,
             redeemCodes=pubg_request.redeemCodes,
         )
+        logger.info(f"PubgPay recharge result for transaction {tx_id}: {succeeded}")
+        for k,v in succeeded.items():
+            if v != True:
+                raise Exception(succeeded)
 
-        if succeeded:
-            update_status(tx_id, "success", notify=True)
-            logger.info(f"Transaction {tx_id} completed successfully")
-        else:
-            # Let RQ handle the retry mechanism
-            raise Exception(f"PubgPay recharge failed for transaction {tx_id}")
+        update_status(tx_id, "success", notify=True, result=json.dumps(succeeded, ensure_ascii=False))
+        logger.info(f"Transaction {tx_id} completed successfully")
             
     except Exception as e:
         logger.error(f"Error processing Pubg load transaction {tx_id}: {str(e)}")
@@ -119,7 +119,7 @@ def on_job_failure(job, connection, type, value, traceback):
     tx_id = job.args[0] if job.args else None
     if tx_id:
         logger.error(f"Transaction {tx_id} failed permanently after all retries")
-        update_status(tx_id, "error", notify=True)
+        update_status(tx_id, "error", notify=True, result=str(value))
 
 
 def process_transaction_by_type_job(tx_id: str, order_type: str, order_payload: dict):
@@ -129,7 +129,7 @@ def process_transaction_by_type_job(tx_id: str, order_type: str, order_payload: 
             process_pubg_load_job(tx_id, order_payload)
         else:
             logger.error(f"Unknown order type: {order_type} for transaction {tx_id}")
-            update_status(tx_id, "error", notify=True)
+            update_status(tx_id, "error", notify=True, result=f"Unknown order type: {order_type}")
             raise Exception(f"Unknown order type: {order_type}")
     except Exception as e:
         logger.error(f"Error processing transaction {tx_id}: {str(e)}")
@@ -218,7 +218,7 @@ def create_pubg_transaction(body: PubgLoadRequest) -> TransactionIDResponse:
     except Exception as e:
         logger.error(f"Failed to enqueue transaction {tx_id}: {str(e)}")
         # Mark transaction as error if we can't enqueue it
-        update_status(tx_id, "error", notify=True)
+        update_status(tx_id, "error", notify=True, result=str(e))
         raise
 
     return TransactionIDResponse(transactionsId=tx_id)
@@ -235,7 +235,7 @@ def get_status(tx_id: str) -> TransactionStatusResponse:
         db.close()
 
 
-def update_status(tx_id: str, status: TransactionStatus, notify: bool = False):
+def update_status(tx_id: str, status: TransactionStatus, notify: bool = False, result: str = None):
     db = _get_db_session()
     try:
         tx = db.query(Transaction).get(tx_id)
@@ -244,6 +244,8 @@ def update_status(tx_id: str, status: TransactionStatus, notify: bool = False):
             db.add(tx)
         else:
             tx.status = status
+            if result is not None:
+                tx.result = result
         db.commit()
     finally:
         db.close()
@@ -299,7 +301,7 @@ def resume_pending_transactions():
                 logger.info(f"Re-enqueued transaction {tx.id} as job {job.id} with {max_retries} max retries")
             else:
                 logger.warning(f"Transaction {tx.id} has no order payload, marking as error")
-                update_status(tx.id, "error", notify=True)
+                update_status(tx.id, "error", notify=True, result="Missing order payload")
         except Exception as e:
             logger.error(f"Error resuming transaction {tx.id}: {str(e)}")
-            update_status(tx.id, "error", notify=True)
+            update_status(tx.id, "error", notify=True, result=str(e))

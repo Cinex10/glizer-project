@@ -10,4 +10,5 @@ class Transaction(Base):
     status = Column(String, index=True)
     order_type = Column(String, index=True)  # e.g., "pubg"
     order_payload = Column(Text)  # JSON string of the order data
-    remaining_retries = Column(Integer, default=3)  # Number of retries left 
+    remaining_retries = Column(Integer, default=3)  # Number of retries left
+    result = Column(Text)  # JSON string of the result data

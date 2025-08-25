@@ -33,7 +33,7 @@ async def lifespan(app: FastAPI):
     # Schedule periodic cleanup of user-data folder using RQ
     # ------------------------------------------------------------------
     try:
-        ttl_days = int(os.getenv("USER_DATA_TTL_IN_DAYS", "3600"))
+        ttl_days = int(os.getenv("USER_DATA_TTL_IN_DAYS", "3"))
         interval_seconds = int(timedelta(days=ttl_days).total_seconds())  # convert days to seconds
 
         maintenance_queue = Queue(

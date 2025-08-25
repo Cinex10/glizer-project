@@ -73,10 +73,10 @@ class PlayerSwitchError(Exception):
     pass
 
 class Browser:
-    def __init__(self) -> None:
+    def __init__(self, email:str) -> None:
         logger.info("init ##")
         url = os.getcwd()
-        user_data = os.path.join(url, 'user-data')
+        user_data = os.path.join(url, f'user-data-{email}')
         os.makedirs(user_data, mode=0o700, exist_ok=True)
         os.chmod(user_data, stat.S_IRWXU)
         options = Options()
@@ -478,12 +478,18 @@ class Browser:
 
     def check_redemption_outcome(self):
         """Check and return redemption result"""
+        screenshot_path = f"screenshots/redeem_success_{int(time.time())}.png"
+        self.driver.save_screenshot(screenshot_path)
+        logger.info(f"Screenshot saved to {screenshot_path}")
         try:
             success_element = WebDriverWait(self.driver, 10).until(
                 EC.presence_of_element_located((By.XPATH, REDEEM_SUCCESS_NOTICE_XPATH)))
             self.driver.execute_script('#root > div > div.PaymentResult_container_wrap__ddHmB > div > div.PurchaseContainer_btn_box__7kd\+o > div > div > div > div > div')
             return True
         except Exception:
+            screenshot_path = f"screenshots/redeem_success_2_{int(time.time())}.png"
+            self.driver.save_screenshot(screenshot_path)
+            logger.info(f"Screenshot saved to {screenshot_path}")
             try:
                 ok_btn = WebDriverWait(self.driver, 5).until(
                         EC.element_to_be_clickable((By.XPATH, REDEEM_CONFIRM_BTN_POP_UP_XPATH))
@@ -495,6 +501,9 @@ class Browser:
                 return True
             
             except Exception:
+                screenshot_path = f"screenshots/redeem_success_2_{int(time.time())}.png"
+                self.driver.full_Screenshot(screenshot_path)
+                logger.info(f"Screenshot saved to {screenshot_path}")
                 error_element = WebDriverWait(self.driver, 3).until(
                 EC.presence_of_element_located((By.XPATH, CODE_ERROR_NOTICE_XPATH)))
                 raise Exception(error_element.text)
@@ -547,7 +556,7 @@ class Browser:
 
 def process_pubg_recharge(emailAddress, password, playerId, redeemCodes):
 
-    browser = Browser()
+    browser = Browser(email=emailAddress)
 
     result = {}
     
@@ -581,6 +590,13 @@ def process_pubg_recharge(emailAddress, password, playerId, redeemCodes):
                 continue
     except Exception as err:
         logger.error(f"Redeem code error: {code}, {str(err)}")
-        result[code] = str(err)
+        raise Exception(f"Failed to redeem code: {str(err), result}")
     finally:
         return result
+    
+    
+    
+
+if __name__ == "__main__":
+    r = process_pubg_recharge(emailAddress="nijoj40533@saierw.com", password="mMzZ8H922M6xL82c", playerId="512590258", redeemCodes=["gxNcMpjP29254cH6S8"])
+    print(r)
