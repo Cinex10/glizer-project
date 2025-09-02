@@ -4,6 +4,8 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.action_chains import ActionChains
 import time
 import os
 from selenium.common.exceptions import TimeoutException, WebDriverException
@@ -55,13 +57,16 @@ REDEEM_CODE_POP_UP_CONTENT_XPATH = "//div[contains(@class, 'PopConfirmRedeem_mes
 
 
 
-SUBMIT_REDEEM_CODE_BUTTON_XPATH='/html/body/div[2]/div/div[7]/div[7]/div[2]/div/div[6]/div[1]/div/div/div/div/div'
-SUBMIT_REDEEM_CODE_BUTTON_XPATH2='/html/body/div[2]/div/div[7]/div[7]/div[2]/div/div[7]/div[1]/div/div/div/div/div'
-SUBMIT_REDEEM_CODE_BUTTON_XPATH3="//div[contains(@class, 'Button_icon_text__')][contains(text(),'إرسال')]"
+# XPath basé sur la structure HTML du bouton "إرسال" (Send)
+SUBMIT_REDEEM_CODE_BUTTON_XPATH="//div[contains(@class, 'Button_btn_P0ibl') and contains(@class, 'Button_btn_primary_1ncdM')]"
+SUBMIT_REDEEM_CODE_BUTTON_XPATH2="//div[contains(@class, 'Button_text_WeIeb') and text()='إرسال']"
+SUBMIT_REDEEM_CODE_BUTTON_XPATH3="//div[contains(@class, 'PopConfirmRedeem_btn_wrap_3RKFf')]//div[contains(@class, 'Button_btn_P0ibl')]"
+SUBMIT_REDEEM_CODE_BUTTON_XPATH4="//div[contains(@class, 'Button_icon_text_C-ysi')]//div[contains(@class, 'Button_text_WeIeb') and text()='إرسال']"
+SUBMIT_REDEEM_CODE_BUTTON_XPATH5="//div[contains(@class, 'PopConfirmRedeem_btn_wrap_3RKFf')]//div[contains(@class, 'Button_text_WeIeb') and text()='إرسال']"
 
 REDEEM_ERROR_NOTICE_XPATH="//div[contains(@class, 'Input_error_text__')]//div[1]"
-# REDEEM_SUCCESS_NOTICE_XPATH = '/html/body/div[2]/div/div[3]/div/div[1]/div/div[1]'
-REDEEM_SUCCESS_NOTICE_XPATH = "//div[contains(@class, 'PurchaseContainer_text__')][contains(text(),'نجاح')]"
+# XPath pour détecter le message de succès "تم استبداله بنجاح"
+REDEEM_SUCCESS_NOTICE_XPATH = "//div[contains(@class, 'PurchaseContainer_text_OmIRF') and contains(text(),'تم استبداله بنجاح')]"
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -80,50 +85,65 @@ class Browser:
         os.makedirs(user_data, mode=0o700, exist_ok=True)
         os.chmod(user_data, stat.S_IRWXU)
         options = Options()
-        options.page_load_strategy = 'normal'  # Changed from 'none' to ensure page loads
+        options.page_load_strategy = 'normal'
         options.add_argument(f"--user-data-dir={user_data}")
         
+        # Ajouter quelques variations réalistes
+        user_agents = [
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+        ]
+        options.add_argument(f"--user-agent={random.choice(user_agents)}")
+        
         # Ubuntu server compatibility arguments
-        options.add_argument("--headless")  # Run in headless mode
-        options.add_argument("--no-sandbox")  # Required for Docker/server environments
-        options.add_argument("--disable-dev-shm-usage")  # Overcome limited resource problems
-        options.add_argument("--disable-gpu")  # Disable GPU acceleration
-        options.add_argument("--disable-extensions")  # Disable extensions
-        options.add_argument("--disable-plugins")  # Disable plugins
-        options.add_argument("--window-size=1920,1080")  # Set window size for headless mode
-        options.add_argument("--disable-web-security")  # Disable web security for iframe issues
-        options.add_argument("--disable-features=VizDisplayCompositor")  # Fix rendering issues
-        options.add_argument("--disable-background-timer-throttling")  # Prevent iframe throttling
-        options.add_argument("--disable-renderer-backgrounding")  # Keep iframe rendering active
-        options.add_argument("--lang=ar")  # Set language to Arabic
+        options.add_argument("--headless") 
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--disable-extensions")
+        options.add_argument("--disable-plugins")
+        options.add_argument("--window-size=1920,1080")
+        options.add_argument("--disable-web-security")
+        options.add_argument("--disable-features=VizDisplayCompositor")
+        options.add_argument("--disable-background-timer-throttling")
+        options.add_argument("--disable-renderer-backgrounding")
+        options.add_argument("--lang=ar")
         options.add_experimental_option("prefs", {
             "intl.accept_languages": "ar,ar-SA,en-US,en"
         })
-        
-        # Keep maximized for non-headless environments (will be ignored in headless mode)
         options.add_argument("--start-maximized")
         
         try:
             self.driver = webdriver.Chrome(options=options)
-            # Test the session immediately
             self.driver.get("about:blank")
         except Exception as e:
             logger.error(f"Failed to initialize Chrome driver: {e}")
             raise Exception(f"Browser initialization failed: {e}")
         
-        # Set timeouts to prevent hanging
-        self.driver.set_page_load_timeout(30)
-        self.driver.implicitly_wait(10)
-        # self.driver = webdriver.Chrome(options=options)
-    
+        # Randomiser les timeouts légèrement
+        self.driver.set_page_load_timeout(random.randint(28, 32))
+        self.driver.implicitly_wait(random.randint(9, 11))
+
+    def human_delay(self, min_sec=0.5, max_sec=2.0):
+        """Délai humain aléatoire"""
+        time.sleep(random.uniform(min_sec, max_sec))
+
     def safe_click(self, locator, delay=15):
         """Click element with retries and JS fallback"""
         element = WebDriverWait(self.driver, delay).until(
             EC.element_to_be_clickable(locator))
+        
+        # Scroll avec position aléatoire
+        scroll_pos = random.choice(['start', 'center', 'end'])
+        self.driver.execute_script(f"arguments[0].scrollIntoView({{block: '{scroll_pos}', behavior: 'smooth'}});", element)
+        self.human_delay(0.3, 0.8)
+        
         try:
             element.click()
         except Exception:
             self.driver.execute_script("arguments[0].click();", element)
+        
+        self.human_delay(0.2, 0.6)  # Pause après clic
 
     def is_session_valid(self):
         """Check if the current browser session is valid"""
@@ -392,6 +412,11 @@ class Browser:
     def redeem_code(self, redeem_code):
         """Redeem code with proper error handling and status tracking"""
         try:
+            logger.info(f"Starting redemption for code: {redeem_code}")
+            
+            # Délai avant de commencer
+            self.human_delay(1.0, 2.5)
+            
             # Enter redemption code
             redeem_input = WebDriverWait(self.driver, 15).until(
             EC.presence_of_element_located((By.XPATH, REDEEM_CODE_INPUT_BOX_XPATH))
@@ -403,60 +428,95 @@ class Browser:
                 EC.visibility_of(redeem_input)
             )
             
-            self.clear_and_type(redeem_input, redeem_code)
-            time.sleep(random.uniform(0.5, 1.2))
+            # Cliquer d'abord sur le champ
+            redeem_input.click()
+            self.human_delay(0.3, 0.7)
             
+            self.clear_and_type(redeem_input, redeem_code)
+            logger.info("Code entered")
+            
+            # Pause comme un humain qui vérifie le code
+            self.human_delay(1.0, 2.0)
             
             # Initiate redemption
+            logger.info("Clicking redeem button...")
             self.driver.execute_script('document.querySelector("#root > div.App.app-wrap__relative > div.container_wrap > div.redeem_modules_box.default_box > div > div.RedeemStepBox_step_box__kecmM.RedeemStepBox_redeem_step__Cb6tE > div.RedeemStepBox_mess__6gbK6 > div.RedeemStepBox_btn_wrap__wEKY9 > div > div").click()')
+            
+            # Attendre après clic
+            self.human_delay(1.5, 3.0)
             
             try:
                 error_element = WebDriverWait(self.driver, 4).until(
                     EC.presence_of_element_located((By.XPATH, CODE_ERROR_NOTICE_XPATH)))
-
                 raise Exception(error_element.text)
-            except:
+            except TimeoutException:
                 pass
                 
             try:
                 WebDriverWait(self.driver, 15).until(
                 EC.visibility_of_element_located((By.XPATH, REDEEM_CODE_POP_UP_XPATH))
                 )
+                logger.info("Popup appeared")
                 self.human_scroll()
+                self.human_delay(1.0, 2.0)  # Pause après scroll
+
+                # Prendre une capture d'écran avant de chercher le bouton pour débogage
+                debug_screenshot = f"screenshots/debug_before_button_search_{int(time.time())}.png"
+                self.driver.save_screenshot(debug_screenshot)
+                logger.info(f"Debug screenshot saved: {debug_screenshot}")
+                
+                # Debug: afficher tous les boutons disponibles sur la page
+                try:
+                    all_buttons = self.driver.find_elements(By.XPATH, "//div[contains(@class, 'Button')]")
+                    logger.info(f"Found {len(all_buttons)} button elements on page")
+                    for i, btn in enumerate(all_buttons[:10]):  # Limiter à 10 pour éviter le spam
+                        try:
+                            text = btn.text.strip()
+                            classes = btn.get_attribute("class")
+                            logger.info(f"Button {i+1}: text='{text}', classes='{classes}'")
+                        except:
+                            logger.info(f"Button {i+1}: could not read text/classes")
+                except Exception as e:
+                    logger.warning(f"Could not enumerate buttons: {str(e)}")
 
                 # Handle submission
                 self.handle_redemption_submission()
                 
                 logger.info('Redemption submitted')
-            except Exception:
+            except TimeoutException:
                 try:
                     ok_btn = WebDriverWait(self.driver, 4).until(
                     EC.element_to_be_clickable((By.XPATH, REDEEM_CONFIRM_BTN_POP_UP_XPATH))
                     )
-                    # ok_btn = self.driver.find_element(By.XPATH, REDEEM_CONFIRM_BTN_POP_UP_XPATH)
                     self.safe_click(ok_btn)
-                except Exception:
+                    logger.info("Clicked OK button")
+                except TimeoutException:
                     try:
                         error_element = WebDriverWait(self.driver, 3).until(
                         EC.presence_of_element_located((By.XPATH, CODE_ERROR_NOTICE_XPATH)))
                         raise Exception(error_element.text)
-                    except:
+                    except TimeoutException:
                         raise Exception('unknown error')
-                
 
-            # Check outcome
+            # Check outcome avec temps d'inspection étendu
             return self.check_redemption_outcome()
 
         except Exception as e:
             raise e
 
-    # Helper methods
     def clear_and_type(self, element, text):
         """Clear field and type text with human-like intervals"""
         element.clear()
+        self.human_delay(0.2, 0.5)
+        
         for char in text:
             element.send_keys(char)
-            time.sleep(random.uniform(0.05, 0.2))
+            # Variation dans la vitesse de frappe
+            time.sleep(random.uniform(0.05, 0.25))
+            
+            # Pause occasionnelle (comme réflexion)
+            if random.random() < 0.08:  # 8% chance
+                time.sleep(random.uniform(0.3, 0.8))
 
     def wait_for_page_load(self, timeout=30):
         """Wait for page to fully load"""
@@ -465,49 +525,155 @@ class Browser:
         )
 
     def handle_redemption_submission(self):
-        """Handle different submission scenarios"""
-        for locator in [SUBMIT_REDEEM_CODE_BUTTON_XPATH3, SUBMIT_REDEEM_CODE_BUTTON_XPATH, SUBMIT_REDEEM_CODE_BUTTON_XPATH2]:
-            try:
-                btn = WebDriverWait(self.driver, 10).until(
-                    EC.presence_of_element_located((By.XPATH, locator)))
-                self.safe_click(btn)
+        """Handle different submission scenarios - Version simplifiée et directe"""
+        logger.info("Trying to find and click submit button...")
+        
+        # Approche simple et directe : chercher tous les boutons avec la classe Button_text__WeIeb
+        try:
+            logger.info("Trying simple approach: find all Button_text__WeIeb elements")
+            
+            # Attendre que les boutons soient présents
+            WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "div.Button_text__WeIeb"))
+            )
+            
+            # Trouver tous les boutons avec cette classe
+            buttons = self.driver.find_elements(By.CSS_SELECTOR, "div.Button_text__WeIeb")
+            logger.info(f"Found {len(buttons)} buttons with Button_text__WeIeb class")
+            
+            # Chercher le bouton qui contient "إرسال" ou qui est cliquable
+            for i, btn in enumerate(buttons):
+                try:
+                    # Essayer de lire le texte
+                    text = btn.text.strip()
+                    logger.info(f"Button {i+1} text: '{text}'")
+                    
+                    # Si on trouve "إرسال", cliquer dessus
+                    if text == "إرسال":
+                        logger.info(f"Found button with text 'إرسال', clicking...")
+                        self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn)
+                        time.sleep(1)
+                        self.safe_click(btn)
+                        logger.info("Successfully clicked button with text 'إرسال'")
+                        return
+                        
+                except Exception as e:
+                    logger.warning(f"Could not read button {i+1}: {str(e)}")
+                    continue
+            
+            # Si aucun bouton avec "إرسال" n'est trouvé, essayer de cliquer sur le premier bouton cliquable
+            logger.info("No button with 'إرسال' text found, trying first clickable button...")
+            for i, btn in enumerate(buttons):
+                try:
+                    if btn.is_enabled() and btn.is_displayed():
+                        logger.info(f"Trying to click button {i+1} (enabled and displayed)")
+                        self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn)
+                        time.sleep(1)
+                        self.safe_click(btn)
+                        logger.info(f"Successfully clicked button {i+1}")
+                        return
+                except Exception as e:
+                    logger.warning(f"Could not click button {i+1}: {str(e)}")
+                    continue
+            
+        except Exception as e:
+            logger.warning(f"Simple approach failed: {str(e)}")
+        
+        # Fallback: essayer de cliquer directement avec JavaScript
+        try:
+            logger.info("Trying JavaScript fallback...")
+            js_script = """
+            var buttons = document.querySelectorAll('div.Button_text__WeIeb');
+            if (buttons.length > 0) {
+                // Essayer de cliquer sur le premier bouton visible
+                for (var i = 0; i < buttons.length; i++) {
+                    if (buttons[i].offsetParent !== null) { // Vérifier si visible
+                        buttons[i].click();
+                        return true;
+                    }
+                }
+            }
+            return false;
+            """
+            result = self.driver.execute_script(js_script)
+            if result:
+                logger.info("Successfully clicked button using JavaScript fallback")
                 return
-            except TimeoutException:
-                continue
-        raise RedemptionError("No valid submit button found")
+        except Exception as e:
+            logger.warning(f"JavaScript fallback failed: {str(e)}")
+        
+        raise RedemptionError("Could not find or click submit button")
 
     def check_redemption_outcome(self):
-        """Check and return redemption result"""
-        screenshot_path = f"screenshots/redeem_success_{int(time.time())}.png"
+        """Check and return redemption result avec wait pour inspection"""
+        logger.info("🔍 Waiting 5 seconds to inspect redemption outcome...")
+        
+        # Temps d'inspection étendu
+        inspection_time = random.uniform(4.0, 7.0)
+        time.sleep(inspection_time)
+        logger.info(f"Inspection completed after {inspection_time:.1f} seconds")
+        
+        # Prendre une capture d'écran pour débogage
+        screenshot_path = f"screenshots/redeem_outcome_check_{int(time.time())}.png"
         self.driver.save_screenshot(screenshot_path)
-        logger.info(f"Screenshot saved to {screenshot_path}")
+        logger.info(f"📸 Outcome check screenshot saved: {screenshot_path}")
+        
         try:
-            success_element = WebDriverWait(self.driver, 10).until(
+            # Attendre et chercher le message de succès "تم استبداله بنجاح"
+            logger.info("Looking for success message: 'تم استبداله بنجاح'")
+            success_element = WebDriverWait(self.driver, 15).until(
                 EC.presence_of_element_located((By.XPATH, REDEEM_SUCCESS_NOTICE_XPATH)))
-            self.driver.execute_script('#root > div > div.PaymentResult_container_wrap__ddHmB > div > div.PurchaseContainer_btn_box__7kd\+o > div > div > div > div > div')
-            return True
-        except Exception:
-            screenshot_path = f"screenshots/redeem_success_2_{int(time.time())}.png"
-            self.driver.save_screenshot(screenshot_path)
-            logger.info(f"Screenshot saved to {screenshot_path}")
-            try:
-                ok_btn = WebDriverWait(self.driver, 5).until(
-                        EC.element_to_be_clickable((By.XPATH, REDEEM_CONFIRM_BTN_POP_UP_XPATH))
-                        )
-                self.safe_click(ok_btn)
-                
-                success_element = WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.XPATH, REDEEM_SUCCESS_NOTICE_XPATH)))
-                return True
             
-            except Exception:
-                screenshot_path = f"screenshots/redeem_success_2_{int(time.time())}.png"
-                self.driver.full_Screenshot(screenshot_path)
-                logger.info(f"Screenshot saved to {screenshot_path}")
-                error_element = WebDriverWait(self.driver, 3).until(
-                EC.presence_of_element_located((By.XPATH, CODE_ERROR_NOTICE_XPATH)))
-                raise Exception(error_element.text)
-    
+            # Corriger l'escape sequence du CSS selector
+            try:
+                self.driver.execute_script('document.querySelector("#root > div > div.PaymentResult_container_wrap__ddHmB > div > div.PurchaseContainer_btn_box__7kd\\+o > div > div > div > div > div").click()')
+            except Exception as e:
+                logger.warning(f"Could not click continue button: {e}")
+            
+            # Lire le texte du message de succès
+            success_text = success_element.text.strip()
+            logger.info(f"✅ SUCCESS message found: '{success_text}'")
+            
+            # Vérifier que c'est bien le bon message
+            if "تم استبداله بنجاح" in success_text:
+                logger.info("✅ SUCCESS: Code redeemed successfully!")
+                return True
+            else:
+                logger.warning(f"Unexpected success message: '{success_text}'")
+                return True
+                
+        except TimeoutException:
+            logger.warning("Could not find success message with XPath")
+            
+            # Essayer de chercher le message de succès avec d'autres méthodes
+            try:
+                logger.info("Trying alternative method to find success message...")
+                possible_success_elements = self.driver.find_elements(By.XPATH, "//div[contains(text(), 'تم استبداله بنجاح')]")
+                
+                if possible_success_elements:
+                    success_text = possible_success_elements[0].text.strip()
+                    logger.info(f"✅ SUCCESS found with alternative method: '{success_text}'")
+                    return True
+                    
+            except Exception as e2:
+                logger.warning(f"Alternative method also failed: {str(e2)}")
+            
+            # Prendre une capture d'écran d'erreur
+            error_screenshot = f"screenshots/redeem_error_{int(time.time())}.png"
+            self.driver.save_screenshot(error_screenshot)
+            logger.info(f"📸 Error screenshot saved: {error_screenshot}")
+            
+            # Essayer de trouver un message d'erreur
+            try:
+                error_element = WebDriverWait(self.driver, 5).until(
+                    EC.presence_of_element_located((By.XPATH, CODE_ERROR_NOTICE_XPATH)))
+                error_text = error_element.text.strip()
+                logger.error(f"❌ ERROR found: '{error_text}'")
+                raise Exception(error_text)
+            except TimeoutException:
+                logger.error("❌ No success or error message found - unknown outcome")
+                raise Exception("Unknown redemption outcome")
+
     def human_scroll(self, selector=REDEEM_CODE_POP_UP_CONTENT_XPATH, portion=2):
         """Simulate human-like scrolling behavior"""
         scroll_pause_time = random.uniform(0.5, 1.2)
@@ -555,15 +721,11 @@ class Browser:
     
 
 def process_pubg_recharge(emailAddress, password, playerId, redeemCodes):
-
     browser = Browser(email=emailAddress)
-
     result = {}
     
     browser.visit_page()
     try:
-        #
-        #browser.implicitly_wait(10)
         is_logged_in = browser.is_logged_in()
         logger.info(f'is logged in: {is_logged_in}')
         if not is_logged_in:
@@ -571,7 +733,6 @@ def process_pubg_recharge(emailAddress, password, playerId, redeemCodes):
         
     except Exception as e:
         logger.error(f"Sign in error: {str(e)}")
-        
         screenshot_file = f"screenshots/screenshot_sign_in.png"
         browser.driver.save_screenshot(screenshot_file)
         logger.info(f"Screenshot saved as: {screenshot_file}")
@@ -579,24 +740,41 @@ def process_pubg_recharge(emailAddress, password, playerId, redeemCodes):
 
     try:
         browser.switch_player_id(player_id=playerId)
-        for code in redeemCodes:
+        
+        # Traiter les codes avec délais entre eux
+        for i, code in enumerate(redeemCodes):
             try:
+                logger.info(f"📝 Processing code {i+1}/{len(redeemCodes)}: {code}")
+                
+                # Délai entre codes (sauf pour le premier)
+                if i > 0:
+                    delay = random.uniform(3.0, 8.0)
+                    logger.info(f"⏱️ Waiting {delay:.1f} seconds before next code...")
+                    time.sleep(delay)
+                
                 redeem_status = browser.redeem_code(redeem_code=code)
-                #  result['code'] = 'Successfully redeemed code'
                 result[code] = redeem_status
+                logger.info(f"✅ Code {code} processed successfully")
+                
             except Exception as err:
+                logger.error(f"❌ Failed to process code {code}: {str(err)}")
                 result[code] = str(err)
-            finally:
+                
+                # Délai même après erreur
+                browser.human_delay(2.0, 4.0)
                 continue
+        
+        logger.info("🎉 All redemptions completed!")
+        
     except Exception as err:
         logger.error(f"Redeem code error: {code}, {str(err)}")
         raise Exception(f"Failed to redeem code: {str(err), result}")
     finally:
+        # Délai avant fermeture
+        browser.human_delay(1.0, 3.0)
         return result
-    
-    
-    
 
+# Garder le main pour les tests
 if __name__ == "__main__":
-    r = process_pubg_recharge(emailAddress="nijoj40533@saierw.com", password="mMzZ8H922M6xL82c", playerId="512590258", redeemCodes=["gxNcMpjP29254cH6S8"])
+    r = process_pubg_recharge(emailAddress="nijoj40533@saierw.com", password="mMzZ8H922M6xL82c", playerId="512590258", redeemCodes=["gxNcMpjb2H2e45G8G6"])
     print(r)
