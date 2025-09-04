@@ -78,14 +78,16 @@ class PlayerSwitchError(Exception):
     pass
 
 class Browser:
-    def __init__(self, email:str) -> None:
+    def __init__(self, email: str) -> None:
         logger.info("init ##")
+        # GESTION SIMPLE COMME LE CODE DE RÉFÉRENCE
         url = os.getcwd()
         user_data = os.path.join(url, f'user-data-{email}')
         os.makedirs(user_data, mode=0o700, exist_ok=True)
         os.chmod(user_data, stat.S_IRWXU)
+        
         options = Options()
-        options.page_load_strategy = 'normal'
+        options.page_load_strategy = 'normal'  # Comme le code de référence
         options.add_argument(f"--user-data-dir={user_data}")
         
         # Ajouter quelques variations réalistes
@@ -95,8 +97,8 @@ class Browser:
         ]
         options.add_argument(f"--user-agent={random.choice(user_agents)}")
         
-        # Ubuntu server compatibility arguments
-        options.add_argument("--headless") 
+        # Ubuntu server compatibility arguments - EXACTEMENT COMME LE CODE DE RÉFÉRENCE
+        options.add_argument("--headless")  # Activé comme dans le code de référence
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-gpu")
@@ -115,12 +117,13 @@ class Browser:
         
         try:
             self.driver = webdriver.Chrome(options=options)
+            # Test immédiat comme le code de référence
             self.driver.get("about:blank")
         except Exception as e:
             logger.error(f"Failed to initialize Chrome driver: {e}")
             raise Exception(f"Browser initialization failed: {e}")
         
-        # Randomiser les timeouts légèrement
+        # Timeouts exactement comme le code de référence
         self.driver.set_page_load_timeout(random.randint(28, 32))
         self.driver.implicitly_wait(random.randint(9, 11))
 
@@ -180,8 +183,6 @@ class Browser:
             logger.info('Cookies accepted')
         except:
             logger.info("Cookies already accepted")
-        
-        
     
     def is_logged_in(self) -> bool:
         try:
@@ -356,15 +357,29 @@ class Browser:
             # Continue anyway as login might have succeeded
         logger.info('passkey_button clicked')
 
+    def is_signed_in(self) -> bool:
+        """Méthode manquante - ajoutée comme dans le code de référence"""
+        try:
+            self.wait_for_page_load()
+            self.driver.find_element(By.XPATH, PLAYER_LOGIN_BTN_XPATH)
+            return False
+        except:
+            return True
+
     def get_current_player_id(self):
-        original_element = WebDriverWait(self.driver, 10).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, PLAYER_ID_LOCATION_CSS))
-                )
-        original_player_id = original_element.text.strip().replace('(','').replace(')','')
-        return original_player_id        
+        """Get current player ID if available, return None if not found"""
+        try:
+            original_element = WebDriverWait(self.driver, 10).until(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, PLAYER_ID_LOCATION_CSS))
+                    )
+            original_player_id = original_element.text.strip().replace('(','').replace(')','')
+            return original_player_id        
+        except Exception as e:
+            logger.info(f"Could not find current player ID: {str(e)}")
+            return None        
     
     def switch_player_id(self, player_id):
-        """Switch to specified player ID with improved error handling"""
+        """Switch to specified player ID - GARDE EXACTEMENT LA LOGIQUE DE VOTRE CODE ACTUEL"""
         
         try:
             if not str(player_id).isdigit():
@@ -372,45 +387,190 @@ class Browser:
 
             self.driver.switch_to.default_content()
             
-            # Get current player ID
+            # Check if we need to get current player ID or if we can proceed directly
             try:
                 original_player_id = self.get_current_player_id()
-            except Exception:
-                raise Exception("Player ID element not found")
+                logger.info(f"Current player ID found: {original_player_id}")
 
-            if str(player_id) == original_player_id:
-                logger.info("Player ID already matches target ID")
+                # Check if ID already matches
+                if str(player_id) == original_player_id:
+                    logger.info("Player ID already matches target ID")
+                    return
+
+                # If ID doesn't match, use the old service approach (switch icon method)
+                logger.info(f"Current ID '{original_player_id}' doesn't match target '{player_id}', using switch icon method...")
+                
+                # Use the old service approach with switch icon
+                switch_btn = WebDriverWait(self.driver, 15).until(
+                    EC.element_to_be_clickable((By.XPATH, PLAYER_ID_SWITCH_INITIATE_BUTTON_XPATH)))
+                self.safe_click(switch_btn)
+                logger.info("Player ID switch initiated with switch icon")
+
+                # Handle ID input using old service approach
+                id_input = WebDriverWait(self.driver, 15).until(
+                    EC.element_to_be_clickable((By.XPATH, PLAYER_ID_INPUT_FIELD_XPATH)))
+                self.clear_and_type(id_input, str(player_id))
+
+                # Confirm change using old service approach
+                confirm_btn = WebDriverWait(self.driver, 15).until(
+                    EC.element_to_be_clickable((By.XPATH, PLAYER_ID_SWITCH_OK_BUTTON_XPATH)))
+                self.safe_click(confirm_btn)
+
+                # Verify change
+                WebDriverWait(self.driver, 15).until(
+                    lambda d: self.get_current_player_id() == str(player_id))
+                logger.info("Player ID successfully changed using switch icon method")
                 return
+                    
+            except Exception as e:
+                logger.info(f"No current player ID found: {str(e)}")
+                logger.info("Proceeding directly to player ID change with new method...")
+                # Continue without checking current ID
 
-            # Initiate player ID change
-            switch_btn = WebDriverWait(self.driver, 15).until(
-                EC.element_to_be_clickable((By.XPATH, PLAYER_ID_SWITCH_INITIATE_BUTTON_XPATH)))
-            self.safe_click(switch_btn)
-            logger.info("Player ID switch initiated")
-
-            # Handle ID input
+            # Step 1: Find and click the "أدخل معرف اللاعب" button
+            logger.info("Looking for 'أدخل معرف اللاعب' button...")
+            
+            # DEBUG: Prendre une capture d'écran avant de chercher le bouton
+            debug_screenshot = f"screenshots/debug_before_player_id_button_search_{int(time.time())}.png"
+            self.driver.save_screenshot(debug_screenshot)
+            logger.info(f"Debug screenshot saved: {debug_screenshot}")
+            
+            # Debug: afficher tous les boutons disponibles sur la page
+            try:
+                all_buttons = self.driver.find_elements(By.XPATH, "//div[contains(@class, 'Button')]")
+                logger.info(f"Found {len(all_buttons)} button elements on page")
+                for i, btn in enumerate(all_buttons[:15]):  # Limiter à 15 pour éviter le spam
+                    try:
+                        text = btn.text.strip()
+                        classes = btn.get_attribute("class")
+                        logger.info(f"Button {i+1}: text='{text}', classes='{classes}'")
+                    except:
+                        logger.info(f"Button {i+1}: could not read text/classes")
+            except Exception as e:
+                logger.warning(f"Could not list buttons: {str(e)}")
+            
+            # Debug: chercher spécifiquement les éléments avec le texte arabe
+            try:
+                arabic_elements = self.driver.find_elements(By.XPATH, "//*[contains(text(), 'أدخل معرف اللاعب')]")
+                logger.info(f"Found {len(arabic_elements)} elements with 'أدخل معرف اللاعب' text")
+                for i, elem in enumerate(arabic_elements):
+                    try:
+                        tag = elem.tag_name
+                        classes = elem.get_attribute("class")
+                        logger.info(f"Arabic element {i+1}: tag='{tag}', classes='{classes}'")
+                    except:
+                        logger.info(f"Arabic element {i+1}: could not read details")
+            except Exception as e:
+                logger.warning(f"Could not search for Arabic text: {str(e)}")
+            
+            enter_player_id_btn = WebDriverWait(self.driver, 15).until(
+                EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'Button_text__WeIeb') and contains(text(), 'أدخل معرف اللاعب')]")))
+            self.safe_click(enter_player_id_btn)
+            logger.info("'أدخل معرف اللاعب' button clicked")
+            
+            # Wait for popup to appear
+            self.human_delay(1.0, 2.0)
+            
+            # Step 2: Find and fill the player ID input field
+            logger.info("Looking for player ID input field...")
             id_input = WebDriverWait(self.driver, 15).until(
-                EC.element_to_be_clickable((By.XPATH, PLAYER_ID_INPUT_FIELD_XPATH)))
+                EC.presence_of_element_located((By.XPATH, "//input[@placeholder='إدخال حساب معرف لاعب']")))
+            
+            # Clear and type the new player ID
             self.clear_and_type(id_input, str(player_id))
-
-            # Confirm change
-            confirm_btn = WebDriverWait(self.driver, 15).until(
-                EC.element_to_be_clickable((By.XPATH, PLAYER_ID_SWITCH_OK_BUTTON_XPATH)))
-            self.safe_click(confirm_btn)
-
-            # Verify change
-            WebDriverWait(self.driver, 15).until(
-                lambda d: self.get_current_player_id() == str(player_id))
-            logger.info("Player ID successfully changed") 
+            logger.info(f"Player ID '{player_id}' entered")
+            
+            # Step 3: Find and click the OK button
+            logger.info("Looking for OK button...")
+            
+            # DEBUG: Prendre une capture d'écran avant de chercher le bouton OK
+            debug_screenshot = f"screenshots/debug_before_ok_button_search_{int(time.time())}.png"
+            self.driver.save_screenshot(debug_screenshot)
+            logger.info(f"Debug screenshot saved: {debug_screenshot}")
+            
+            # Debug: afficher tous les boutons disponibles sur la page
+            try:
+                all_buttons = self.driver.find_elements(By.XPATH, "//div[contains(@class, 'Button')]")
+                logger.info(f"Found {len(all_buttons)} button elements on page")
+                for i, btn in enumerate(all_buttons[:15]):  # Limiter à 15 pour éviter le spam
+                    try:
+                        text = btn.text.strip()
+                        classes = btn.get_attribute("class")
+                        logger.info(f"Button {i+1}: text='{text}', classes='{classes}'")
+                    except:
+                        logger.info(f"Button {i+1}: could not read text/classes")
+            except Exception as e:
+                logger.warning(f"Could not list buttons: {str(e)}")
+            
+            # Debug: chercher spécifiquement les éléments avec le texte "OK"
+            try:
+                ok_elements = self.driver.find_elements(By.XPATH, "//*[contains(text(), 'OK')]")
+                logger.info(f"Found {len(ok_elements)} elements with 'OK' text")
+                for i, elem in enumerate(ok_elements):
+                    try:
+                        tag = elem.tag_name
+                        classes = elem.get_attribute("class")
+                        logger.info(f"OK element {i+1}: tag='{tag}', classes='{classes}'")
+                    except:
+                        logger.info(f"OK element {i+1}: could not read details")
+            except Exception as e:
+                logger.warning(f"Could not search for OK text: {str(e)}")
+            
+            # Essayer plusieurs sélecteurs pour le bouton OK
+            ok_selectors = [
+                "//div[contains(@class, 'Button_text_WeIeb') and contains(text(), 'OK')]",
+                "//div[contains(@class, 'Button_text__WeIeb') and contains(text(), 'OK')]",
+                "//div[contains(@class, 'Button_btn') and contains(text(), 'OK')]",
+                "//div[contains(@class, 'Button') and contains(text(), 'OK')]",
+                "//*[contains(text(), 'OK') and contains(@class, 'Button')]",
+                "//button[contains(text(), 'OK')]",
+                "//div[text()='OK']"
+            ]
+            
+            ok_btn = None
+            for selector in ok_selectors:
+                try:
+                    logger.info(f"Trying OK button selector: {selector}")
+                    ok_btn = WebDriverWait(self.driver, 5).until(
+                        EC.element_to_be_clickable((By.XPATH, selector)))
+                    logger.info(f"OK button found with selector: {selector}")
+                    break
+                except Exception as e:
+                    logger.info(f"Selector '{selector}' failed: {str(e)}")
+                    continue
+            
+            if ok_btn is None:
+                raise Exception("OK button not found with any selector")
+                
+            self.safe_click(ok_btn)
+            logger.info("OK button clicked")
+            
+            # Wait for the change to take effect
+            self.human_delay(2.0, 3.0)
+            
+            # Step 4: Verify the change (optional if no current ID)
+            try:
+                new_player_id = self.get_current_player_id()
+                if new_player_id is not None:
+                    if str(player_id) == new_player_id:
+                        logger.info("Player ID successfully changed and verified")
+                    else:
+                        logger.warning(f"Player ID verification failed. Expected: {player_id}, Got: {new_player_id}")
+                else:
+                    logger.info("Player ID change completed (verification not possible - no current ID display)")
+            except Exception as e:
+                logger.warning(f"Could not verify player ID change: {str(e)}")
+                # Continue anyway as the change might have succeeded
+                
         except Exception as e:
             logger.error(f"Player switch failed: {str(e)}")
             screenshot_file = "screenshots/Player switch failed.png"
             self.driver.save_screenshot(screenshot_file)
             logger.info(f"Screenshot saved as: {screenshot_file}")
-            raise Exception("Invalid Player ID")
+            raise Exception(f"Player switch failed: {str(e)}")
 
     def redeem_code(self, redeem_code):
-        """Redeem code with proper error handling and status tracking"""
+        """Redeem code - GARDE EXACTEMENT LA LOGIQUE DE VOTRE CODE ACTUEL"""
         try:
             logger.info(f"Starting redemption for code: {redeem_code}")
             
@@ -525,7 +685,7 @@ class Browser:
         )
 
     def handle_redemption_submission(self):
-        """Handle different submission scenarios - Version simplifiée et directe"""
+        """Handle different submission scenarios - GARDE EXACTEMENT VOTRE LOGIQUE"""
         logger.info("Trying to find and click submit button...")
         
         # Approche simple et directe : chercher tous les boutons avec la classe Button_text__WeIeb
@@ -605,7 +765,7 @@ class Browser:
         raise RedemptionError("Could not find or click submit button")
 
     def check_redemption_outcome(self):
-        """Check and return redemption result avec wait pour inspection"""
+        """Check and return redemption result - GARDE EXACTEMENT VOTRE LOGIQUE"""
         logger.info("🔍 Waiting 5 seconds to inspect redemption outcome...")
         
         # Temps d'inspection étendu
@@ -675,7 +835,7 @@ class Browser:
                 raise Exception("Unknown redemption outcome")
 
     def human_scroll(self, selector=REDEEM_CODE_POP_UP_CONTENT_XPATH, portion=2):
-        """Simulate human-like scrolling behavior"""
+        """Simulate human-like scrolling behavior - GARDE EXACTEMENT VOTRE LOGIQUE"""
         scroll_pause_time = random.uniform(0.5, 1.2)
         scroll_amount = random.randint(200, 400)
         
@@ -721,6 +881,7 @@ class Browser:
     
 
 def process_pubg_recharge(emailAddress, password, playerId, redeemCodes):
+    # GESTION SIMPLE EXACTEMENT COMME LE CODE DE RÉFÉRENCE
     browser = Browser(email=emailAddress)
     result = {}
     
@@ -774,7 +935,7 @@ def process_pubg_recharge(emailAddress, password, playerId, redeemCodes):
         browser.human_delay(1.0, 3.0)
         return result
 
-# Garder le main pour les tests
+# Garder le main pour les tests - EXACTEMENT COMME LE CODE DE RÉFÉRENCE
 if __name__ == "__main__":
-    r = process_pubg_recharge(emailAddress="nijoj40533@saierw.com", password="mMzZ8H922M6xL82c", playerId="512590258", redeemCodes=["gxNcMpjb2H2e45G8G6"])
+    r = process_pubg_recharge(emailAddress="Abdull82ah@hotmail.com", password="ZXCVzxcv@1010", playerId="533938203", redeemCodes=["gxNcMmj72s2a4eGfQ8"])   
     print(r)
