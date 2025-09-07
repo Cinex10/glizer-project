@@ -180,60 +180,32 @@ async def health_check():
 
 @app.get("/stats")
 async def get_stats():
-    """Obtenir les statistiques essentielles du système"""
+    """Obtenir les statistiques du système"""
     
     db = get_db_session()
     try:
-        # Compter les transactions par statut essentiel
-        pending = db.query(Transaction).filter(Transaction.status == "pending").count()
-        processing = db.query(Transaction).filter(Transaction.status == "processing").count()
-        success = db.query(Transaction).filter(Transaction.status == "success").count()
-        failed = db.query(Transaction).filter(Transaction.status == "failed").count()
+        # Compter les transactions par statut
+        stats = {}
+        for status in ["pending", "processing", "success", "error", "retry"]:
+            count = db.query(Transaction).filter(Transaction.status == status).count()
+            stats[status] = count
         
         # Statistiques générales
-        total_transactions = pending + processing + success + failed
-        success_rate = (success / total_transactions * 100) if total_transactions > 0 else 0
+        total_transactions = db.query(Transaction).count()
+        successful_transactions = db.query(Transaction).filter(Transaction.status == "success").count()
+        failed_transactions = db.query(Transaction).filter(Transaction.status == "error").count()
+        
+        success_rate = (successful_transactions / total_transactions * 100) if total_transactions > 0 else 0
         
         return {
             "total_transactions": total_transactions,
+            "successful_transactions": successful_transactions,
+            "failed_transactions": failed_transactions,
             "success_rate": round(success_rate, 2),
-            "status_breakdown": {
-                "pending": pending,      # En attente
-                "processing": processing, # En cours d'exécution
-                "success": success,      # Réussies
-                "failed": failed         # Échouées après 3 tentatives
-            },
+            "status_breakdown": stats,
             "thread_manager": thread_manager.get_status()
         }
         
-    finally:
-        db.close()
-
-@app.post("/reset-database")
-async def reset_database():
-    """Réinitialiser complètement la base de données"""
-    
-    db = get_db_session()
-    try:
-        # Compter les transactions avant suppression
-        total_before = db.query(Transaction).count()
-        
-        # Supprimer toutes les transactions
-        db.query(Transaction).delete()
-        db.commit()
-        
-        logger.info(f"Database reset: {total_before} transactions deleted")
-        
-        return {
-            "message": "Base de données réinitialisée avec succès",
-            "deleted_transactions": total_before,
-            "status": "success"
-        }
-        
-    except Exception as e:
-        logger.error(f"Error resetting database: {str(e)}")
-        db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to reset database")
     finally:
         db.close()
 

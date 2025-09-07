@@ -158,26 +158,25 @@ class Browser:
         self.driver.set_page_load_timeout(random.randint(28, 32))
         self.driver.implicitly_wait(random.randint(9, 11))
 
-    def human_delay(self, min_sec=0.5, max_sec=2.0):
-        """Délai humain aléatoire"""
+    def human_delay(self, min_sec=0.05, max_sec=0.15):
+        """Délai humain aléatoire - ultra-rapide"""
         time.sleep(random.uniform(min_sec, max_sec))
 
-    def safe_click(self, locator, delay=15):
-        """Click element with retries and JS fallback"""
+    def safe_click(self, locator, delay=2):
+        """Click element with retries and JS fallback - ultra-rapide"""
         element = WebDriverWait(self.driver, delay).until(
             EC.element_to_be_clickable(locator))
         
-        # Scroll avec position aléatoire
-        scroll_pos = random.choice(['start', 'center', 'end'])
-        self.driver.execute_script(f"arguments[0].scrollIntoView({{block: '{scroll_pos}', behavior: 'smooth'}});", element)
-        self.human_delay(0.3, 0.8)
+        # Scroll ultra-rapide
+        self.driver.execute_script("arguments[0].scrollIntoView({block: 'center', behavior: 'auto'});", element)
+        time.sleep(0.05)
         
         try:
             element.click()
         except Exception:
             self.driver.execute_script("arguments[0].click();", element)
         
-        self.human_delay(0.2, 0.6)  # Pause après clic
+        time.sleep(0.05)  # Pause ultra-minimale après clic
 
     def is_session_valid(self):
         """Check if the current browser session is valid"""
@@ -197,8 +196,10 @@ class Browser:
             logger.info(f"Current URL after navigation: {self.driver.current_url}")
             logger.info(f"Page title: {self.driver.title}")
             
-            # Wait for page to load
-            self.wait_for_page_load(timeout=30)
+            # Wait for page to load - optimisé pour être plus rapide
+            WebDriverWait(self.driver, 5).until(
+                lambda d: d.execute_script("return document.readyState") in ["interactive", "complete"]
+            )
             logger.info("Page loaded successfully")
             
         except Exception as e:
@@ -216,27 +217,87 @@ class Browser:
             logger.info("Cookies already accepted")
     
     def is_logged_in(self) -> bool:
+        """Vérification ultra-rapide de l'état de connexion"""
         try:
-            self.wait_for_page_load()
-            self.driver.find_element(By.XPATH, PLAYER_LOGIN_BTN_XPATH)
+            # Méthode 0: Vérification JavaScript ultra-rapide
+            try:
+                # Vérifier si le bouton de connexion existe via JavaScript
+                login_button_exists = self.driver.execute_script("""
+                    var loginBtn = document.querySelector('div.MobileNav_sign_in__qA2oK');
+                    return loginBtn !== null && loginBtn.offsetParent !== null;
+                """)
+                
+                if login_button_exists:
+                    logger.info("⚡ JavaScript check: Login button visible - user is NOT logged in")
+                    return False
+                else:
+                    logger.info("⚡ JavaScript check: Login button not visible - user IS logged in")
+                    return True
+                    
+            except Exception as js_e:
+                logger.warning(f"JavaScript check failed: {str(js_e)}")
+            
+            # Méthode 1: Vérification rapide sans attendre le chargement complet
+            WebDriverWait(self.driver, 1).until(
+                lambda d: d.execute_script("return document.readyState") in ["interactive", "complete"]
+            )
+            
+            # Méthode 2: Chercher le bouton de connexion
+            try:
+                self.driver.find_element(By.XPATH, PLAYER_LOGIN_BTN_XPATH)
+                logger.info("Login button found - user is NOT logged in")
+                return False
+            except:
+                pass
+            
+            # Méthode 3: Vérifier si on peut trouver des éléments d'utilisateur connecté
+            try:
+                # Chercher des éléments qui indiquent une connexion
+                user_elements = [
+                    "//span[contains(@class, 'UserTabBox_id__')]",  # Player ID display
+                    "//div[contains(@class, 'Banner_user_tab_box__')]",  # User tab
+                    "//div[contains(@class, 'MobileNav_user__')]"  # User nav
+                ]
+                
+                for selector in user_elements:
+                    try:
+                        element = WebDriverWait(self.driver, 0.3).until(
+                            EC.presence_of_element_located((By.XPATH, selector))
+                        )
+                        if element.is_displayed():
+                            logger.info("User elements found - user IS logged in")
+                            return True
+                    except:
+                        continue
+                        
+            except:
+                pass
+            
+            # Si aucune méthode n'a fonctionné, considérer comme non connecté
+            logger.info("No clear login status - assuming NOT logged in")
             return False
-        except:
-            return True
+            
+        except Exception as e:
+            logger.warning(f"Login check failed: {str(e)} - assuming NOT logged in")
+            return False
 
     def sign_in(self, email_address, password):
         logger.info('Sign In')
-        self.wait_for_page_load()
+        # Attendre seulement que la page soit interactive, pas complètement chargée
+        WebDriverWait(self.driver, 5).until(
+            lambda d: d.execute_script("return document.readyState") in ["interactive", "complete"]
+        )
 
         logger.info('Page Loaded')
         status = self.driver.execute_script(f"document.querySelector('{SIGN_IN_BUTTON_SELECTOR}').click();return 'clicked login button'")
-        time.sleep(random.uniform(1, 2.5))
+        time.sleep(random.uniform(0.2, 0.5))
 
         status = self.driver.execute_script(f"document.querySelector('{SIGN_IN_BUTTON_SELECTOR2}').click();return 'clicked login button'")
         
         logger.info(status)
 
         try:
-            iframe = WebDriverWait(self.driver, 15).until(
+            iframe = WebDriverWait(self.driver, 1).until(
                 EC.presence_of_element_located((By.XPATH, IFRAME_XPATH))
             )
             logger.info('iframe found')
@@ -250,8 +311,8 @@ class Browser:
             except Exception as debug_e:
                 logger.warning(f'Failed to get iframe properties: {debug_e}')
             
-            # Wait a bit more for iframe to be fully loaded
-            time.sleep(2)
+            # Wait minimal for iframe to be fully loaded
+            time.sleep(0.1)
             
             # Try switching to iframe regardless of display/enabled status
             try:
@@ -260,7 +321,7 @@ class Browser:
                 
                 # Validate we're actually in the iframe
                 try:
-                    WebDriverWait(self.driver, 5).until(
+                    WebDriverWait(self.driver, 1).until(
                         EC.presence_of_element_located((By.TAG_NAME, "body"))
                     )
                     logger.info('iframe content accessible')
@@ -290,12 +351,12 @@ class Browser:
 
         logger.info('iframe switched')
         
-        time.sleep(random.uniform(1, 2.5))
+        time.sleep(random.uniform(0.2, 0.5))
         
         status = self.driver.find_element(By.XPATH, SIGN_IN_BUTTON_XPATH_SELECTOR3).click()
-        time.sleep(random.uniform(1, 2.5))
+        time.sleep(random.uniform(0.2, 0.5))
 
-        email_address_field=WebDriverWait(self.driver, 10).until(
+        email_address_field=WebDriverWait(self.driver, 2).until(
             EC.presence_of_element_located((By.XPATH, EMAIL_ADDRESS_FIELD_XPATH))
         )
         
@@ -307,7 +368,7 @@ class Browser:
         else:
             logger.info('Email Address is already filled. Skipping the step.')
         
-        continue_button = WebDriverWait(self.driver, 20).until(
+        continue_button = WebDriverWait(self.driver, 3).until(
                     EC.presence_of_element_located((By.XPATH, CONTINUE_SIGN_IN_BUTTON_XPATH))
                 )
         
@@ -324,7 +385,7 @@ class Browser:
         
         logger.info('continue_button')
 
-        password_input_field = WebDriverWait(self.driver, 15).until(
+        password_input_field = WebDriverWait(self.driver, 2).until(
             EC.presence_of_element_located((By.XPATH,PASSWORD_INPUT_FIELD_XPATH))
         )
 
@@ -333,74 +394,63 @@ class Browser:
         logger.info('password_input_field')
 
         self.driver.find_element(By.XPATH, FINAL_SIGN_IN_BUTTON_XPATH).click()
-        logger.info("Arrive ")
-        time.sleep(3)
+        logger.info("✅ Login button clicked")
         
-        # Try to handle different post-login scenarios
+        # Délai minimal après clic
+        time.sleep(0.2)
+        
+        # Vérification ultra-rapide post-login
         try:
-            # Check if we're already logged in successfully
+            # Retour au contenu principal
             self.driver.switch_to.default_content()
+            
+            # Vérification immédiate si on est connecté (sans délai)
             if self.is_signed_in():
-                logger.info("Already signed in successfully")
+                logger.info("✅ Login successful - already signed in")
                 return
                 
-            # Switch back to iframe if still in login flow
+            # Si pas encore connecté, vérification JavaScript rapide
             self.driver.switch_to.frame(0)
             
-            # Look for passkey button with shorter timeout
+            # Vérification JavaScript ultra-rapide pour détecter les éléments post-login
             try:
-                passkey_button = WebDriverWait(self.driver, 10).until(
-                    EC.presence_of_element_located((By.XPATH, '/html/body/div/div[1]/div/div[1]'))
-                )
-                logger.info('passkey_button found')
-                self.driver.execute_script('arguments[0].click()', passkey_button)
-                logger.info('passkey_button clicked')
+                has_passkey = self.driver.execute_script("""
+                    var passkeyBtn = document.evaluate('/html/body/div/div[1]/div/div[1]', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+                    return passkeyBtn !== null && passkeyBtn.offsetParent !== null;
+                """)
                 
-            except TimeoutException:
-                logger.warning("Passkey button not found, checking for other elements")
-                
-                # Look for alternative completion indicators
-                alternative_selectors = [
-                    "//button[contains(text(), 'Continue')]",
-                    "//button[contains(text(), 'Skip')]", 
-                    "//div[contains(@class, 'success')]",
-                    "//div[contains(@class, 'complete')]"
-                ]
-                
-                found_alternative = False
-                for selector in alternative_selectors:
-                    try:
-                        element = WebDriverWait(self.driver, 2).until(
-                            EC.presence_of_element_located((By.XPATH, selector))
-                        )
-                        logger.info(f"Found alternative element: {selector}")
-                        element.click()
-                        found_alternative = True
-                        break
-                    except:
-                        continue
-                
-                if not found_alternative:
-                    logger.info("No post-login actions needed, checking login status")
+                if has_passkey:
+                    logger.info("⚡ Passkey button detected via JavaScript, clicking...")
+                    self.driver.execute_script("""
+                        var passkeyBtn = document.evaluate('/html/body/div/div[1]/div/div[1]', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+                        if (passkeyBtn) passkeyBtn.click();
+                    """)
+                    time.sleep(0.1)
                     
+                    # Vérifier immédiatement après
+                    self.driver.switch_to.default_content()
+                    if self.is_signed_in():
+                        logger.info("✅ Login completed after passkey")
+                        return
+                else:
+                    logger.info("⚡ No passkey button needed - login may be complete")
+                    
+            except Exception as js_e:
+                logger.warning(f"JavaScript check failed: {str(js_e)}")
+                
         except Exception as e:
-            logger.error(f"Post-login handling error: {str(e)}")
-            # Continue anyway as login might have succeeded
-        logger.info('passkey_button clicked')
+            logger.warning(f"Post-login handling: {str(e)}")
+            # Continuer même si les actions post-login échouent
 
     def is_signed_in(self) -> bool:
-        """Méthode manquante - ajoutée comme dans le code de référence"""
-        try:
-            self.wait_for_page_load()
-            self.driver.find_element(By.XPATH, PLAYER_LOGIN_BTN_XPATH)
-            return False
-        except:
-            return True
+        """Vérification ultra-rapide de l'état de connexion (méthode alternative)"""
+        # Utiliser la même logique que is_logged_in pour la cohérence
+        return self.is_logged_in()
 
     def get_current_player_id(self):
-        """Get current player ID if available, return None if not found"""
+        """Get current player ID if available, return None if not found - ultra-fast"""
         try:
-            original_element = WebDriverWait(self.driver, 10).until(
+            original_element = WebDriverWait(self.driver, 1).until(
                         EC.presence_of_element_located((By.CSS_SELECTOR, PLAYER_ID_LOCATION_CSS))
                     )
             original_player_id = original_element.text.strip().replace('(','').replace(')','')
@@ -432,23 +482,23 @@ class Browser:
                 logger.info(f"Current ID '{original_player_id}' doesn't match target '{player_id}', using switch icon method...")
                 
                 # Use the old service approach with switch icon
-                switch_btn = WebDriverWait(self.driver, 15).until(
+                switch_btn = WebDriverWait(self.driver, 8).until(
                     EC.element_to_be_clickable((By.XPATH, PLAYER_ID_SWITCH_INITIATE_BUTTON_XPATH)))
                 self.safe_click(switch_btn)
                 logger.info("Player ID switch initiated with switch icon")
 
                 # Handle ID input using old service approach
-                id_input = WebDriverWait(self.driver, 15).until(
+                id_input = WebDriverWait(self.driver, 8).until(
                     EC.element_to_be_clickable((By.XPATH, PLAYER_ID_INPUT_FIELD_XPATH)))
                 self.clear_and_type(id_input, str(player_id))
 
                 # Confirm change using old service approach
-                confirm_btn = WebDriverWait(self.driver, 15).until(
+                confirm_btn = WebDriverWait(self.driver, 8).until(
                     EC.element_to_be_clickable((By.XPATH, PLAYER_ID_SWITCH_OK_BUTTON_XPATH)))
                 self.safe_click(confirm_btn)
 
                 # Verify change
-                WebDriverWait(self.driver, 15).until(
+                WebDriverWait(self.driver, 8).until(
                     lambda d: self.get_current_player_id() == str(player_id))
                 logger.info("Player ID successfully changed using switch icon method")
                 return
@@ -494,17 +544,17 @@ class Browser:
             except Exception as e:
                 logger.warning(f"Could not search for Arabic text: {str(e)}")
             
-            enter_player_id_btn = WebDriverWait(self.driver, 15).until(
+            enter_player_id_btn = WebDriverWait(self.driver, 8).until(
                 EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'Button_text__WeIeb') and contains(text(), 'أدخل معرف اللاعب')]")))
             self.safe_click(enter_player_id_btn)
             logger.info("'أدخل معرف اللاعب' button clicked")
             
-            # Wait for popup to appear
-            self.human_delay(1.0, 2.0)
+            # Wait for popup to appear - optimisé
+            self.human_delay(0.2, 0.5)
             
             # Step 2: Find and fill the player ID input field
             logger.info("Looking for player ID input field...")
-            id_input = WebDriverWait(self.driver, 15).until(
+            id_input = WebDriverWait(self.driver, 8).until(
                 EC.presence_of_element_located((By.XPATH, "//input[@placeholder='إدخال حساب معرف لاعب']")))
             
             # Clear and type the new player ID
@@ -547,7 +597,7 @@ class Browser:
             except Exception as e:
                 logger.warning(f"Could not search for OK text: {str(e)}")
             
-            # Essayer plusieurs sélecteurs pour le bouton OK
+            # Essayer plusieurs sélecteurs pour le bouton OK - optimisé
             ok_selectors = [
                 "//div[contains(@class, 'Button_text_WeIeb') and contains(text(), 'OK')]",
                 "//div[contains(@class, 'Button_text__WeIeb') and contains(text(), 'OK')]",
@@ -562,7 +612,7 @@ class Browser:
             for selector in ok_selectors:
                 try:
                     logger.info(f"Trying OK button selector: {selector}")
-                    ok_btn = WebDriverWait(self.driver, 5).until(
+                    ok_btn = WebDriverWait(self.driver, 0.5).until(
                         EC.element_to_be_clickable((By.XPATH, selector)))
                     logger.info(f"OK button found with selector: {selector}")
                     break
@@ -576,8 +626,8 @@ class Browser:
             self.safe_click(ok_btn)
             logger.info("OK button clicked")
             
-            # Wait for the change to take effect
-            self.human_delay(2.0, 3.0)
+            # Wait for the change to take effect - optimisé
+            self.human_delay(0.3, 0.8)
             
             # Step 4: Verify the change (optional if no current ID)
             try:
@@ -605,51 +655,51 @@ class Browser:
         try:
             logger.info(f"Starting redemption for code: {redeem_code}")
             
-            # Délai avant de commencer
-            self.human_delay(1.0, 2.5)
+            # Délai avant de commencer - optimisé
+            self.human_delay(0.2, 0.5)
             
             # Enter redemption code
-            redeem_input = WebDriverWait(self.driver, 15).until(
+            redeem_input = WebDriverWait(self.driver, 8).until(
             EC.presence_of_element_located((By.XPATH, REDEEM_CODE_INPUT_BOX_XPATH))
             )
             self.driver.execute_script("arguments[0].scrollIntoView({block: 'center', behavior: 'smooth'});", redeem_input)
                                        
-            # Wait for visibility before interacting
-            WebDriverWait(self.driver, 10).until(
+            # Wait for visibility before interacting - ultra-fast
+            WebDriverWait(self.driver, 1).until(
                 EC.visibility_of(redeem_input)
             )
             
-            # Cliquer d'abord sur le champ
+            # Cliquer d'abord sur le champ - ultra-rapide
             redeem_input.click()
-            self.human_delay(0.3, 0.7)
+            time.sleep(0.05)
             
             self.clear_and_type(redeem_input, redeem_code)
             logger.info("Code entered")
             
-            # Pause comme un humain qui vérifie le code
-            self.human_delay(1.0, 2.0)
+            # Pause comme un humain qui vérifie le code - optimisé
+            self.human_delay(0.2, 0.5)
             
             # Initiate redemption
             logger.info("Clicking redeem button...")
             self.driver.execute_script('document.querySelector("#root > div.App.app-wrap__relative > div.container_wrap > div.redeem_modules_box.default_box > div > div.RedeemStepBox_step_box__kecmM.RedeemStepBox_redeem_step__Cb6tE > div.RedeemStepBox_mess__6gbK6 > div.RedeemStepBox_btn_wrap__wEKY9 > div > div").click()')
             
-            # Attendre après clic
-            self.human_delay(1.5, 3.0)
+            # Attendre après clic - optimisé
+            self.human_delay(0.3, 0.8)
             
             try:
-                error_element = WebDriverWait(self.driver, 4).until(
+                error_element = WebDriverWait(self.driver, 1).until(
                     EC.presence_of_element_located((By.XPATH, CODE_ERROR_NOTICE_XPATH)))
                 raise Exception(error_element.text)
             except TimeoutException:
                 pass
                 
             try:
-                WebDriverWait(self.driver, 15).until(
+                WebDriverWait(self.driver, 2).until(
                 EC.visibility_of_element_located((By.XPATH, REDEEM_CODE_POP_UP_XPATH))
                 )
                 logger.info("Popup appeared")
                 self.human_scroll()
-                self.human_delay(1.0, 2.0)  # Pause après scroll
+                self.human_delay(0.2, 0.5)  # Pause après scroll - optimisé
 
                 # Prendre une capture d'écran avant de chercher le bouton pour débogage
                 debug_screenshot = f"screenshots/debug_before_button_search_{int(time.time())}.png"
@@ -676,14 +726,14 @@ class Browser:
                 logger.info('Redemption submitted')
             except TimeoutException:
                 try:
-                    ok_btn = WebDriverWait(self.driver, 4).until(
+                    ok_btn = WebDriverWait(self.driver, 1).until(
                     EC.element_to_be_clickable((By.XPATH, REDEEM_CONFIRM_BTN_POP_UP_XPATH))
                     )
                     self.safe_click(ok_btn)
                     logger.info("Clicked OK button")
                 except TimeoutException:
                     try:
-                        error_element = WebDriverWait(self.driver, 3).until(
+                        error_element = WebDriverWait(self.driver, 0.5).until(
                         EC.presence_of_element_located((By.XPATH, CODE_ERROR_NOTICE_XPATH)))
                         raise Exception(error_element.text)
                     except TimeoutException:
@@ -696,20 +746,14 @@ class Browser:
             raise e
 
     def clear_and_type(self, element, text):
-        """Clear field and type text with human-like intervals"""
+        """Clear field and type text ultra-fast"""
         element.clear()
-        self.human_delay(0.2, 0.5)
+        time.sleep(0.05)  # Délai minimal
         
-        for char in text:
-            element.send_keys(char)
-            # Variation dans la vitesse de frappe
-            time.sleep(random.uniform(0.05, 0.25))
-            
-            # Pause occasionnelle (comme réflexion)
-            if random.random() < 0.08:  # 8% chance
-                time.sleep(random.uniform(0.3, 0.8))
+        # Saisie ultra-rapide - pas de délai entre caractères
+        element.send_keys(text)
 
-    def wait_for_page_load(self, timeout=30):
+    def wait_for_page_load(self, timeout=10):
         """Wait for page to fully load"""
         WebDriverWait(self.driver, timeout).until(
             lambda d: d.execute_script("return document.readyState") == "complete"
@@ -723,8 +767,8 @@ class Browser:
         try:
             logger.info("Trying simple approach: find all Button_text__WeIeb elements")
             
-            # Attendre que les boutons soient présents
-            WebDriverWait(self.driver, 10).until(
+            # Attendre que les boutons soient présents - ultra-fast
+            WebDriverWait(self.driver, 1).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "div.Button_text__WeIeb"))
             )
             
@@ -799,8 +843,8 @@ class Browser:
         """Check and return redemption result - GARDE EXACTEMENT VOTRE LOGIQUE"""
         logger.info("🔍 Waiting 5 seconds to inspect redemption outcome...")
         
-        # Temps d'inspection étendu
-        inspection_time = random.uniform(4.0, 7.0)
+        # Temps d'inspection ultra-rapide
+        inspection_time = random.uniform(0.3, 0.8)
         time.sleep(inspection_time)
         logger.info(f"Inspection completed after {inspection_time:.1f} seconds")
         
@@ -810,9 +854,9 @@ class Browser:
         logger.info(f"📸 Outcome check screenshot saved: {screenshot_path}")
         
         try:
-            # Attendre et chercher le message de succès "تم استبداله بنجاح"
+            # Attendre et chercher le message de succès "تم استبداله بنجاح" - ultra-fast
             logger.info("Looking for success message: 'تم استبداله بنجاح'")
-            success_element = WebDriverWait(self.driver, 15).until(
+            success_element = WebDriverWait(self.driver, 2).until(
                 EC.presence_of_element_located((By.XPATH, REDEEM_SUCCESS_NOTICE_XPATH)))
             
             # Corriger l'escape sequence du CSS selector
@@ -856,7 +900,7 @@ class Browser:
             
             # Essayer de trouver un message d'erreur
             try:
-                error_element = WebDriverWait(self.driver, 5).until(
+                error_element = WebDriverWait(self.driver, 1).until(
                     EC.presence_of_element_located((By.XPATH, CODE_ERROR_NOTICE_XPATH)))
                 error_text = error_element.text.strip()
                 logger.error(f"❌ ERROR found: '{error_text}'")
@@ -867,7 +911,7 @@ class Browser:
 
     def human_scroll(self, selector=REDEEM_CODE_POP_UP_CONTENT_XPATH, portion=2):
         """Simulate human-like scrolling behavior - GARDE EXACTEMENT VOTRE LOGIQUE"""
-        scroll_pause_time = random.uniform(0.5, 1.2)
+        scroll_pause_time = random.uniform(0.05, 0.15)
         scroll_amount = random.randint(200, 400)
         
         # Get scrollable container (adjust selector if needed)
@@ -908,7 +952,7 @@ class Browser:
             # Update last height and randomize parameters
             last_height = new_height
             scroll_amount = random.randint(150, 300)
-            scroll_pause_time = random.uniform(0.3, 0.8)
+            scroll_pause_time = random.uniform(0.05, 0.15)
     
 
 def process_pubg_recharge(emailAddress, password, playerId, redeemCodes):
@@ -918,16 +962,23 @@ def process_pubg_recharge(emailAddress, password, playerId, redeemCodes):
     
     browser.visit_page()
     try:
+        # Vérification ultra-rapide de l'état de connexion
+        logger.info("🔍 Checking login status...")
         is_logged_in = browser.is_logged_in()
-        logger.info(f'is logged in: {is_logged_in}')
+        logger.info(f'✅ Login status: {"LOGGED IN" if is_logged_in else "NOT LOGGED IN"}')
+        
         if not is_logged_in:
+            logger.info("🚀 Starting login process...")
             browser.sign_in(email_address=emailAddress, password=password)
+            logger.info("✅ Login completed successfully")
+        else:
+            logger.info("⚡ Already logged in - skipping login process")
         
     except Exception as e:
-        logger.error(f"Sign in error: {str(e)}")
+        logger.error(f"❌ Sign in error: {str(e)}")
         screenshot_file = f"screenshots/screenshot_sign_in.png"
         browser.driver.save_screenshot(screenshot_file)
-        logger.info(f"Screenshot saved as: {screenshot_file}")
+        logger.info(f"📸 Screenshot saved as: {screenshot_file}")
         raise Exception("Failed to sign in")
 
     try:
@@ -938,9 +989,9 @@ def process_pubg_recharge(emailAddress, password, playerId, redeemCodes):
             try:
                 logger.info(f"📝 Processing code {i+1}/{len(redeemCodes)}: {code}")
                 
-                # Délai entre codes (sauf pour le premier)
+                # Délai entre codes (sauf pour le premier) - ultra-rapide
                 if i > 0:
-                    delay = random.uniform(3.0, 8.0)
+                    delay = random.uniform(0.2, 0.5)
                     logger.info(f"⏱️ Waiting {delay:.1f} seconds before next code...")
                     time.sleep(delay)
                 
@@ -952,8 +1003,8 @@ def process_pubg_recharge(emailAddress, password, playerId, redeemCodes):
                 logger.error(f"❌ Failed to process code {code}: {str(err)}")
                 result[code] = str(err)
                 
-                # Délai même après erreur
-                browser.human_delay(2.0, 4.0)
+                # Délai même après erreur - ultra-rapide
+                time.sleep(0.1)
                 continue
         
         logger.info("🎉 All redemptions completed!")
@@ -962,8 +1013,8 @@ def process_pubg_recharge(emailAddress, password, playerId, redeemCodes):
         logger.error(f"Redeem code error: {str(err)}")
         raise Exception(f"Failed to redeem code: {str(err)}")
     finally:
-        # Délai avant fermeture
-        browser.human_delay(1.0, 3.0)
+        # Délai avant fermeture - ultra-rapide
+        time.sleep(0.1)
         try:
             browser.driver.quit()
         except:
