@@ -98,7 +98,7 @@ class Browser:
         options.add_argument(f"--user-agent={random.choice(user_agents)}")
         
         # Ubuntu server compatibility arguments - EXACTEMENT COMME LE CODE DE RÉFÉRENCE
-        options.add_argument("--headless")  # Activé comme dans le code de référence
+        # options.add_argument("--headless")  # Activé comme dans le code de référence
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-gpu")
@@ -114,6 +114,37 @@ class Browser:
             "intl.accept_languages": "ar,ar-SA,en-US,en"
         })
         options.add_argument("--start-maximized")
+                # Arguments spécifiques pour Docker - Solution 2
+        options.add_argument("--disable-setuid-sandbox")
+        options.add_argument("--disable-backgrounding-occluded-windows")
+        options.add_argument("--disable-features=TranslateUI")
+        options.add_argument("--disable-ipc-flooding-protection")
+        options.add_argument("--disable-hang-monitor")
+        options.add_argument("--disable-prompt-on-repost")
+        options.add_argument("--disable-sync")
+        options.add_argument("--disable-default-apps")
+        options.add_argument("--disable-background-networking")
+        options.add_argument("--disable-component-extensions-with-background-pages")
+        options.add_argument("--disable-client-side-phishing-detection")
+        options.add_argument("--disable-sync-preferences")
+        options.add_argument("--disable-web-resources")
+        options.add_argument("--disable-logging")
+        options.add_argument("--disable-permissions-api")
+        options.add_argument("--disable-presentation-api")
+        options.add_argument("--disable-print-preview")
+        options.add_argument("--disable-speech-api")
+        options.add_argument("--disable-file-system")
+        options.add_argument("--disable-notifications")
+        options.add_argument("--disable-plugins-discovery")
+        options.add_argument("--disable-preconnect")
+        options.add_argument("--disable-translate")
+        options.add_argument("--disable-web-security")
+        options.add_argument("--allow-running-insecure-content")
+        options.add_argument("--disable-features=VizDisplayCompositor,VizServiceDisplay")
+        options.add_argument("--remote-debugging-port=0")
+        options.add_argument("--disable-blink-features=AutomationControlled")
+        options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        options.add_experimental_option('useAutomationExtension', False)
         
         try:
             self.driver = webdriver.Chrome(options=options)
@@ -800,7 +831,7 @@ class Browser:
                 return True
             else:
                 logger.warning(f"Unexpected success message: '{success_text}'")
-                return True
+                return False
                 
         except TimeoutException:
             logger.warning("Could not find success message with XPath")
@@ -928,11 +959,15 @@ def process_pubg_recharge(emailAddress, password, playerId, redeemCodes):
         logger.info("🎉 All redemptions completed!")
         
     except Exception as err:
-        logger.error(f"Redeem code error: {code}, {str(err)}")
-        raise Exception(f"Failed to redeem code: {str(err), result}")
+        logger.error(f"Redeem code error: {str(err)}")
+        raise Exception(f"Failed to redeem code: {str(err)}")
     finally:
         # Délai avant fermeture
         browser.human_delay(1.0, 3.0)
+        try:
+            browser.driver.quit()
+        except:
+            pass
         return result
 
 # Garder le main pour les tests - EXACTEMENT COMME LE CODE DE RÉFÉRENCE
