@@ -1,64 +1,64 @@
 # 🎮 PUBG Recharge Bot API
 
-Bot automatisé pour les recharges PUBG Mobile avec API REST simple et efficace.
+Automated bot for PUBG Mobile recharges with simple and efficient REST API.
 
-## 🚀 **Installation Rapide**
+## 🚀 **Quick Installation**
 
-### **1. Prérequis**
+### **1. Prerequisites**
 - Python 3.8+
-- Chrome/Chromium installé
-- ChromeDriver dans le PATH
+- Chrome/Chromium installed
+- ChromeDriver in PATH
 
 ### **2. Installation**
 ```bash
-# Cloner le projet
+# Clone the project
 git clone <-repo>
 cd glizer-project
 
-# Installer les dépendances
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-### **3. Démarrage**
+### **3. Startup**
 ```bash
 cd src
 python main.py
 ```
 
-L'API sera disponible sur : `http://localhost:8000`
+API will be available at: `http://localhost:8000`
 
 ## 📡 **API Endpoints**
 
-### **Créer une Transaction**
+### **Create a Transaction**
 ```bash
 curl -X POST "http://localhost:8000/transaction/create" \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "votre@email.com",
-    "password": "votre_mot_de_passe",
+    "email": "your@email.com",
+    "password": "your_password",
     "player_id": "123456789",
     "redeem_codes": ["CODE1"]
   }'
 ```
 
-**Réponse :**
+**Response:**
 ```json
 {
-  "transaction_id": "uuid-de-la-transaction",
+  "transaction_id": "transaction-uuid",
   "status": "pending",
   "message": "Transaction created and queued for processing"
 }
 ```
 
-### **Vérifier le Statut d'une Transaction**
+### **Check Transaction Status**
 ```bash
 curl "http://localhost:8000/transaction/{transaction_id}"
 ```
 
-**Réponse :**
+**Response:**
 ```json
 {
-  "transaction_id": "uuid-de-la-transaction",
+  "transaction_id": "transaction-uuid",
   "status": "success",
   "created_at": "2024-01-15T10:30:00",
   "started_at": "2024-01-15T10:30:05",
@@ -74,26 +74,26 @@ curl "http://localhost:8000/transaction/{transaction_id}"
 }
 ```
 
-### **Lister les Transactions**
+### **List Transactions**
 ```bash
 curl "http://localhost:8000/transactions?limit=50"
 ```
 
-### **Statistiques du Système**
+### **System Statistics**
 ```bash
 curl "http://localhost:8000/stats"
 ```
 
-**Réponse :**
+**Response:**
 ```json
 {
   "total_transactions": 150,
   "success_rate": 75.5,
   "status_breakdown": {
-    "pending": 5,      // En attente
-    "processing": 2,   // En cours d'exécution
-    "success": 110,    // Réussies
-    "failed": 33       // Échouées après 3 tentatives
+    "pending": 5,      // Pending
+    "processing": 2,   // Processing
+    "success": 110,    // Successful
+    "failed": 33       // Failed after 3 attempts
   },
   "thread_manager": {
     "running": true,
@@ -105,83 +105,83 @@ curl "http://localhost:8000/stats"
 }
 ```
 
-### **Réinitialiser la Base de Données**
+### **Reset Database**
 ```bash
 curl -X POST "http://localhost:8000/reset-database"
 ```
 
-### **Vérifier la Santé du Système**
+### **Check System Health**
 ```bash
 curl "http://localhost:8000/health"
 ```
 
-## 📊 **Statuts des Transactions**
+## 📊 **Transaction Statuses**
 
-| Statut | Description |
+| Status | Description |
 |--------|-------------|
-| `pending` | En attente de traitement |
-| `processing` | En cours d'exécution |
-| `success` | Réussie (même partiellement) |
-| `failed` | Échouée après 3 tentatives |
+| `pending` | Pending processing |
+| `processing` | Currently executing |
+| `success` | Successful (even partially) |
+| `failed` | Failed after 3 attempts |
 
-## 🔄 **Système de Retry**
+## 🔄 **Retry System**
 
-- **Maximum 3 tentatives** par transaction
-- **Retry automatique** en cas d'échec temporaire
-- **Succès partiel** : Si 2 codes sur 3 réussissent, la transaction est marquée comme `success`
+- **Maximum 3 attempts** per transaction
+- **Automatic retry** in case of temporary failure
+- **Partial success**: If 2 out of 3 codes succeed, the transaction is marked as `success`
 
-## 📁 **Structure du Projet**
+## 📁 **Project Structure**
 
 ```
 glizer-project/
 ├── src/
-│   ├── main.py              # API FastAPI principale
-│   ├── models.py            # Modèles de base de données
-│   ├── database.py          # Configuration SQLite
-│   ├── thread_manager.py    # Gestionnaire de threads
-│   ├── schemas.py           # Schémas Pydantic
-│   ├── pubg_automation.py   # Wrapper pour le service
+│   ├── main.py              # Main FastAPI application
+│   ├── models.py            # Database models
+│   ├── database.py          # SQLite configuration
+│   ├── thread_manager.py    # Thread manager
+│   ├── schemas.py           # Pydantic schemas
+│   ├── pubg_automation.py   # Service wrapper
 │   ├── pubg/
-│   │   └── service.py       # Service Selenium
-│   └── clean_database.py    # Script de nettoyage
-├── data/                    # Base de données SQLite
-├── screenshots/             # Captures d'écran de debug
-├── user-data/               # User data Chrome par email
-├── requirements.txt         # Dépendances Python
-└── README.md               # Ce fichier
+│   │   └── service.py       # Selenium service
+│   └── clean_database.py    # Cleanup script
+├── data/                    # SQLite database
+├── screenshots/             # Debug screenshots
+├── user-data/               # Chrome user data by email
+├── requirements.txt         # Python dependencies
+└── README.md               # This file
 ```
 
 
 
 ## 🔧 **Configuration**
 
-### **Variables d'Environnement (optionnel)**
-Créez un fichier `.env` dans le dossier `src/` :
+### **Environment Variables (optional)**
+Create a `.env` file in the `src/` folder:
 ```env
 PORT=8000
 LOG_LEVEL=INFO
 DATABASE_URL=sqlite:///./data/transactions.db
 ```
 
-### **Nettoyage de la Base de Données**
+### **Database Cleanup**
 ```bash
 cd src
-python clean_database.py stats          # Voir les statistiques
-python clean_database.py clean-failed   # Supprimer les échecs
-python clean_database.py clean-all      # Supprimer tout
+python clean_database.py stats          # View statistics
+python clean_database.py clean-failed   # Remove failed transactions
+python clean_database.py clean-all      # Remove everything
 ```
 
-## 📝 **Logs et Debug**
+## 📝 **Logs and Debug**
 
-- **Logs** : Affichés dans le terminal
-- **Captures d'écran** : Sauvegardées dans `screenshots/`
-- **Base de données** : `data/transactions.db`
+- **Logs**: Displayed in terminal
+- **Screenshots**: Saved in `screenshots/`
+- **Database**: `data/transactions.db`
 
 ## ⚡ **Performance**
 
-- **1 worker** traite les transactions en FIFO
-- **User data partagé** pour le même email
-- **Retry intelligent** avec backoff
-- **Base de données optimisée** avec SQLite
+- **1 worker** processes transactions in FIFO order
+- **Shared user data** for the same email
+- **Intelligent retry** with backoff
+- **Optimized database** with SQLite
 
 
