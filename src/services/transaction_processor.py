@@ -1,0 +1,282 @@
+"""
+Processeur de transactions avec rotation des credentials
+"""
+import json
+from typing import Dict, Any, Tuple
+from database.models import BotTransaction
+from services.bot_poller import BotPoller
+from services.credential_manager import CredentialManager
+from pubg_automation import process_pubg_transaction
+from logging_config import get_logger
+
+logger = get_logger(__name__)
+
+class TransactionProcessor:
+    def __init__(self):
+        """Initialiser le processeur de transactions avec rotation des credentials"""
+        self.poller = BotPoller()
+        self.credential_manager = CredentialManager()
+        logger.info("TransactionProcessor initialized with credential rotation")
+    
+    def get_next_credential(self) -> Tuple[Dict[str, str], int]:
+        """
+        Obtenir le prochain credential dans la rotation
+        
+        Returns:
+            Tuple (credential_dict, credential_index)
+        """
+        return self.credential_manager.get_next_credential()
+    
+    def process_transaction(self, transaction: BotTransaction) -> Dict[str, Any]:
+        """
+        Traiter une transaction PUBG avec rotation des credentials
+        
+        Args:
+            transaction: Transaction à traiter
+            
+        Returns:
+            Résultat du traitement
+        """
+        logger.info(f"Processing transaction {transaction.id} for bot {transaction.bot_num}")
+        
+        # Obtenir le prochain credential dans la rotation
+        credential, credential_index = self.get_next_credential()
+        email = credential['email']
+        password = credential['password']
+        cred_id = credential.get('id', credential_index)
+        
+        logger.info(f"Transaction {transaction.id}: Using credential {cred_id} ({email})")
+        
+        try:
+            # Marquer comme en cours de traitement
+            self.poller.mark_processing(transaction.id)
+            
+            # Extraire les données du payload (nouveau format Salla)
+            player_id = transaction.get_player_id()
+            redeem_codes = transaction.get_redeem_codes()
+            
+            if not player_id:
+                raise Exception("No player_id found in transaction payload")
+            
+            if not redeem_codes:
+                raise Exception("No redeem codes found in transaction payload")
+            
+            logger.info(f"Transaction {transaction.id}: player_id={player_id}, codes={len(redeem_codes)}")
+            logger.info(f"Transaction {transaction.id}: Using ROTATIVE credentials (not from payload)")
+            
+            # Exécuter l'automatisation PUBG avec le credential rotatif
+            try:
+                result = process_pubg_transaction(
+                    email=email,
+                    password=password,
+                    player_id=player_id,
+                    redeem_codes=redeem_codes
+                )
+                
+                # Vérifier si le résultat est valide
+                if not result or not isinstance(result, dict):
+                    raise Exception("Invalid result from PUBG automation")
+                
+                logger.info(f"Transaction {transaction.id}: PUBG automation result: {result}")
+                
+            except Exception as automation_error:
+                # Si l'automatisation PUBG échoue complètement, marquer comme failed
+                error_msg = f"PUBG automation failed: {str(automation_error)}"
+                logger.error(f"Transaction {transaction.id}: {error_msg}")
+                
+                self.poller.mark_failed(transaction.id, error_msg, increment_retry=True)
+                self.credential_manager.mark_credential_failed(credential_index)
+                
+                return {
+                    "status": "failed",
+                    "error": error_msg,
+                    "message": f"Automation failed: {str(automation_error)}",
+                    "credential_used": {
+                        "id": cred_id,
+                        "email": email,
+                        "index": credential_index
+                    }
+                }
+            
+            # Analyser le résultat détaillé
+            success_count = 0
+            failed_count = 0
+            error_count = 0
+            total_codes = len(result)
+            
+            for code, status in result.items():
+                if status == True or status is True:
+                    success_count += 1
+                elif status == False or status is False:
+                    failed_count += 1
+                elif isinstance(status, str):
+                    # Si c'est une chaîne, c'est une erreur
+                    error_count += 1
+                    logger.warning(f"Transaction {transaction.id}: Code {code} failed with error: {status}")
+                else:
+                    # Statut inconnu, considérer comme erreur
+                    error_count += 1
+                    logger.warning(f"Transaction {transaction.id}: Code {code} has unknown status: {status}")
+            
+            logger.info(f"Transaction {transaction.id}: Results - Success: {success_count}, Failed: {failed_count}, Errors: {error_count}")
+            
+            # Décision basée sur les résultats détaillés
+            if success_count == total_codes:
+                # Succès complet - tous les codes ont réussi
+                self.poller.mark_success(transaction.id, result)
+                self.credential_manager.mark_credential_success(credential_index)
+                logger.info(f"Transaction {transaction.id} completed successfully ({success_count}/{total_codes} codes) with credential {cred_id}")
+                return {
+                    "status": "success",
+                    "result": result,
+                    "message": f"All {total_codes} codes redeemed successfully",
+                    "credential_used": {
+                        "id": cred_id,
+                        "email": email,
+                        "index": credential_index
+                    }
+                }
+            elif success_count > 0:
+                # Succès partiel - au moins un code a réussi
+                self.poller.mark_success(transaction.id, result)
+                self.credential_manager.mark_credential_success(credential_index)
+                logger.info(f"Transaction {transaction.id} completed with partial success ({success_count}/{total_codes} codes) with credential {cred_id}")
+                return {
+                    "status": "partial_success",
+                    "result": result,
+                    "message": f"Partial success: {success_count}/{total_codes} codes redeemed",
+                    "credential_used": {
+                        "id": cred_id,
+                        "email": email,
+                        "index": credential_index
+                    }
+                }
+            else:
+                # Échec complet - aucun code n'a réussi
+                error_msg = f"All {total_codes} codes failed (Success: {success_count}, Failed: {failed_count}, Errors: {error_count})"
+                self.poller.mark_failed(transaction.id, error_msg, increment_retry=True)
+                self.credential_manager.mark_credential_failed(credential_index)
+                logger.error(f"Transaction {transaction.id} failed completely with credential {cred_id}: {error_msg}")
+                return {
+                    "status": "failed",
+                    "result": result,
+                    "message": error_msg,
+                    "credential_used": {
+                        "id": cred_id,
+                        "email": email,
+                        "index": credential_index
+                    }
+                }
+                
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"Transaction {transaction.id} processing failed with credential {cred_id}: {error_msg}")
+            
+            # Marquer le credential comme échoué
+            self.credential_manager.mark_credential_failed(credential_index)
+            
+            # Marquer la transaction comme échouée avec retry
+            self.poller.mark_failed(transaction.id, error_msg, increment_retry=True)
+            
+            return {
+                "status": "error",
+                "error": error_msg,
+                "message": f"Processing failed: {error_msg}",
+                "credential_used": {
+                    "id": cred_id,
+                    "email": email,
+                    "index": credential_index
+                }
+            }
+    
+    def process_pending_transactions(self) -> Dict[str, Any]:
+        """
+        Traiter toutes les transactions en attente
+        
+        Returns:
+            Résumé du traitement
+        """
+        logger.info("Starting batch processing of pending transactions")
+        
+        # Récupérer les transactions en attente
+        pending_transactions = self.poller.get_pending_transactions()
+        
+        if not pending_transactions:
+            logger.info("No pending transactions found")
+            return {
+                "processed": 0,
+                "success": 0,
+                "failed": 0,
+                "message": "No transactions to process"
+            }
+        
+        logger.info(f"Found {len(pending_transactions)} pending transactions")
+        
+        results = {
+            "processed": len(pending_transactions),
+            "success": 0,
+            "partial_success": 0,
+            "failed": 0,
+            "errors": 0,
+            "transactions": []
+        }
+        
+        # Traiter chaque transaction
+        for transaction in pending_transactions:
+            try:
+                result = self.process_transaction(transaction)
+                results["transactions"].append({
+                    "id": transaction.id,
+                    "bot_num": transaction.bot_num,
+                    "status": result["status"],
+                    "message": result.get("message", "")
+                })
+                
+                if result["status"] == "success":
+                    results["success"] += 1
+                elif result["status"] == "partial_success":
+                    results["partial_success"] += 1
+                elif result["status"] == "failed":
+                    results["failed"] += 1
+                else:
+                    results["errors"] += 1
+                    
+            except Exception as e:
+                logger.error(f"Unexpected error processing transaction {transaction.id}: {e}")
+                results["errors"] += 1
+                results["transactions"].append({
+                    "id": transaction.id,
+                    "bot_num": transaction.bot_num,
+                    "status": "error",
+                    "message": f"Unexpected error: {str(e)}"
+                })
+        
+        logger.info(f"Batch processing completed: {results['success']} success, {results['partial_success']} partial, {results['failed']} failed, {results['errors']} errors")
+        
+        return results
+    
+    def get_system_stats(self) -> Dict[str, Any]:
+        """
+        Obtenir les statistiques du système avec rotation des credentials
+        
+        Returns:
+            Statistiques complètes
+        """
+        bot_9_stats = self.poller.get_bot_stats(9)
+        bot_10_stats = self.poller.get_bot_stats(10)
+        credential_stats = self.credential_manager.get_usage_stats()
+        
+        return {
+            "bot_9": bot_9_stats,
+            "bot_10": bot_10_stats,
+            "total_pending": bot_9_stats.get("pending", 0) + bot_10_stats.get("pending", 0),
+            "total_processing": bot_9_stats.get("processing", 0) + bot_10_stats.get("processing", 0),
+            "total_success": bot_9_stats.get("success", 0) + bot_10_stats.get("success", 0),
+            "total_failed": bot_9_stats.get("failed", 0) + bot_10_stats.get("failed", 0),
+            "credential_rotation": {
+                "current_position": credential_stats["current_position"],
+                "total_credentials": credential_stats["total_credentials"],
+                "rotation_progress": credential_stats["rotation_progress"],
+                "usage_stats": credential_stats["usage_stats"]
+            }
+        }

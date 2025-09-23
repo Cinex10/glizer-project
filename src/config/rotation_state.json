@@ -1,0 +1,146 @@
+{
+  "current_index": 10,
+  "usage_stats": {
+    "1": {
+      "email": "Abdull82ah@hotmail.com",
+      "usage_count": 1,
+      "last_used": "2025-09-22T16:58:26.605320",
+      "success_count": 1,
+      "failed_count": 0
+    },
+    "2": {
+      "email": "account2@example.com",
+      "usage_count": 1,
+      "last_used": "2025-09-22T16:58:26.608017",
+      "success_count": 1,
+      "failed_count": 0
+    },
+    "3": {
+      "email": "account3@example.com",
+      "usage_count": 1,
+      "last_used": "2025-09-23T10:31:04.888683",
+      "success_count": 1,
+      "failed_count": 0
+    },
+    "4": {
+      "email": "account4@example.com",
+      "usage_count": 1,
+      "last_used": "2025-09-23T10:48:47.137919",
+      "success_count": 1,
+      "failed_count": 0
+    },
+    "5": {
+      "email": "account5@example.com",
+      "usage_count": 1,
+      "last_used": "2025-09-23T10:51:43.384282",
+      "success_count": 1,
+      "failed_count": 0
+    },
+    "6": {
+      "email": "account6@example.com",
+      "usage_count": 1,
+      "last_used": "2025-09-23T10:59:21.667699",
+      "success_count": 1,
+      "failed_count": 0
+    },
+    "7": {
+      "email": "account7@example.com",
+      "usage_count": 1,
+      "last_used": "2025-09-23T11:04:44.366176",
+      "success_count": 1,
+      "failed_count": 0
+    },
+    "8": {
+      "email": "account8@example.com",
+      "usage_count": 1,
+      "last_used": "2025-09-23T11:07:40.655151",
+      "success_count": 1,
+      "failed_count": 0
+    },
+    "9": {
+      "email": "account9@example.com",
+      "usage_count": 1,
+      "last_used": "2025-09-23T11:11:23.954002",
+      "success_count": 0,
+      "failed_count": 1
+    },
+    "10": {
+      "email": "account10@example.com",
+      "usage_count": 1,
+      "last_used": "2025-09-23T11:12:09.253747",
+      "success_count": 0,
+      "failed_count": 1
+    },
+    "11": {
+      "email": "account11@example.com",
+      "usage_count": 0,
+      "last_used": null,
+      "success_count": 0,
+      "failed_count": 0
+    },
+    "12": {
+      "email": "account12@example.com",
+      "usage_count": 0,
+      "last_used": null,
+      "success_count": 0,
+      "failed_count": 0
+    },
+    "13": {
+      "email": "account13@example.com",
+      "usage_count": 0,
+      "last_used": null,
+      "success_count": 0,
+      "failed_count": 0
+    },
+    "14": {
+      "email": "account14@example.com",
+      "usage_count": 0,
+      "last_used": null,
+      "success_count": 0,
+      "failed_count": 0
+    },
+    "15": {
+      "email": "account15@example.com",
+      "usage_count": 0,
+      "last_used": null,
+      "success_count": 0,
+      "failed_count": 0
+    },
+    "16": {
+      "email": "account16@example.com",
+      "usage_count": 0,
+      "last_used": null,
+      "success_count": 0,
+      "failed_count": 0
+    },
+    "17": {
+      "email": "account17@example.com",
+      "usage_count": 0,
+      "last_used": null,
+      "success_count": 0,
+      "failed_count": 0
+    },
+    "18": {
+      "email": "account18@example.com",
+      "usage_count": 0,
+      "last_used": null,
+      "success_count": 0,
+      "failed_count": 0
+    },
+    "19": {
+      "email": "account19@example.com",
+      "usage_count": 0,
+      "last_used": null,
+      "success_count": 0,
+      "failed_count": 0
+    },
+    "20": {
+      "email": "account20@example.com",
+      "usage_count": 0,
+      "last_used": null,
+      "success_count": 0,
+      "failed_count": 0
+    }
+  },
+  "last_updated": "2025-09-23T11:12:09.288073"
+}
