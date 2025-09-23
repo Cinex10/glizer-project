@@ -1,39 +1,69 @@
+"""
+Schémas Pydantic adaptés pour les bots 9 et 10
+"""
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 
-class PubgRequest(BaseModel):
-    email: str
-    password: str
-    player_id: str
-    redeem_codes: List[str]
-
-class TransactionResponse(BaseModel):
+class BotTransactionResponse(BaseModel):
     transaction_id: str
+    bot_num: int
     status: str
     message: str
 
-class TransactionStatusResponse(BaseModel):
+class BotTransactionStatusResponse(BaseModel):
     transaction_id: str
+    bot_num: int
     status: str
-    created_at: datetime
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    retry_count: int
-    max_retries: int
-    result: Optional[dict] = None
+    created_at: Optional[datetime] = None  # Colonne supprimée dans nouvelle architecture
+    started_at: Optional[datetime] = None  # Colonne supprimée dans nouvelle architecture
+    completed_at: Optional[datetime] = None  # Colonne supprimée dans nouvelle architecture
+    retry_count: int = 0  # Colonne supprimée dans nouvelle architecture
+    max_retries: int = 0  # Colonne supprimée dans nouvelle architecture
+    result: Optional[Dict[str, Any]] = None
     error_message: Optional[str] = None
+    player_id: Optional[str] = None
+    redeem_codes: Optional[List[str]] = None
 
-class TransactionListItem(BaseModel):
+class BotTransactionListItem(BaseModel):
     id: str
-    email: str
-    player_id: str
+    bot_num: int
     status: str
-    created_at: datetime
-    retry_count: int
+    created_at: Optional[datetime] = None  # Colonne supprimée dans nouvelle architecture
+    updated_at: Optional[datetime] = None  # Colonne supprimée dans nouvelle architecture
+    retry_count: int = 0  # Colonne supprimée dans nouvelle architecture
+    player_id: Optional[str] = None
 
 class HealthResponse(BaseModel):
     status: str
     active_threads: int
     max_workers: int
     thread_names: List[str]
+
+class BotStatsResponse(BaseModel):
+    bot_num: int
+    total_transactions: int
+    pending: int
+    processing: int
+    success: int
+    failed: int
+    success_rate: float
+
+class SystemStatsResponse(BaseModel):
+    system_status: str
+    bots: Dict[str, BotStatsResponse]
+    totals: Dict[str, int]
+    thread_manager: Dict[str, Any]
+
+class ProcessResultResponse(BaseModel):
+    transaction_id: str
+    status: str
+    result: Dict[str, Any]
+
+class BatchProcessResponse(BaseModel):
+    status: str
+    result: Dict[str, Any]
+
+class CredentialsStatusResponse(BaseModel):
+    status: str
+    credentials: Dict[str, Dict[str, Any]]

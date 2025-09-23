@@ -1,0 +1,372 @@
+========================================
+GUIDE COMPLET - Commandes SQL pour bots_transactions
+========================================
+
+🔌 CONNEXION À LA BASE DE DONNÉES
+========================================
+
+-- Connexion avec psql (ligne de commande)
+psql -h localhost -p 5432 -U glizer_user -d glizer_db
+
+-- Connexion avec paramètres par défaut
+psql -h localhost -U glizer_user glizer_db
+
+-- Connexion avec mot de passe en une ligne
+PGPASSWORD=glizer_pass psql -h localhost -p 5432 -U glizer_user -d glizer_db
+
+-- Connexion avec URL complète
+psql "postgresql://glizer_user:glizer_pass@localhost:5432/glizer_db"
+
+-- Connexion depuis un script Python (exemple)
+# python -c "
+# from src.database.postgresql import get_postgres_session
+# session = get_postgres_session()
+# print('Connexion réussie!')
+# session.close()
+# "
+
+-- Test de connexion rapide
+psql -h localhost -U glizer_user -d glizer_db -c "SELECT 1 as test;"
+
+-- Vérifier la version de PostgreSQL
+psql -h localhost -U glizer_user -d glizer_db -c "SELECT version();"
+
+-- Voir les bases de données disponibles
+psql -h localhost -U glizer_user -d glizer_db -c "\l"
+
+-- Voir les tables de la base glizer_db
+psql -h localhost -U glizer_user -d glizer_db -c "\dt"
+
+-- Voir la structure de la table bots_transactions
+psql -h localhost -U glizer_user -d glizer_db -c "\d bots_transactions"
+
+-- Variables d'environnement pour la connexion
+export POSTGRES_HOST=localhost
+export POSTGRES_PORT=5432
+export POSTGRES_DB=glizer_db
+export POSTGRES_USER=glizer_user
+export POSTGRES_PASSWORD=glizer_pass
+
+-- Connexion avec variables d'environnement
+psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB
+
+-- Créer un fichier .pgpass pour éviter de taper le mot de passe
+# Format: hostname:port:database:username:password
+echo "localhost:5432:glizer_db:glizer_user:glizer_pass" >> ~/.pgpass
+chmod 600 ~/.pgpass
+
+-- Connexion sans mot de passe (avec .pgpass)
+psql -h localhost -U glizer_user -d glizer_db
+
+-- Script de test de connexion complet
+# !/bin/bash
+echo "Testing PostgreSQL connection..."
+psql -h localhost -p 5432 -U glizer_user -d glizer_db -c "
+SELECT 
+    'Connection successful!' as status,
+    current_database() as database,
+    current_user as user,
+    version() as postgres_version;
+"
+
+========================================
+🔍 CONSULTATION (SELECT)
+========================================
+
+-- Voir toutes les transactions
+SELECT * FROM bots_transactions;
+
+-- Voir les transactions en attente
+SELECT * FROM bots_transactions WHERE status = 'pending';
+
+-- Voir les transactions réussies
+SELECT * FROM bots_transactions WHERE status = 'success';
+
+-- Voir les transactions échouées
+SELECT * FROM bots_transactions WHERE status = 'failure';
+
+-- Voir les transactions PUBG seulement
+SELECT * FROM bots_transactions WHERE bot_type = 'pubg';
+
+-- Voir les transactions Yalla Ludo seulement
+SELECT * FROM bots_transactions WHERE bot_type = 'yalla_ludo';
+
+-- Voir les transactions d'un bot spécifique
+SELECT * FROM bots_transactions WHERE bot_num = 9;
+
+-- Voir les transactions avec des critères multiples
+SELECT * FROM bots_transactions 
+WHERE bot_type = 'pubg' AND bot_num IN (9, 10) AND status = 'pending';
+
+-- Compter les transactions par statut
+SELECT status, COUNT(*) as count 
+FROM bots_transactions 
+GROUP BY status;
+
+-- Compter les transactions par bot_type
+SELECT bot_type, COUNT(*) as count 
+FROM bots_transactions 
+GROUP BY bot_type;
+
+-- Voir les transactions récentes (par ID)
+SELECT * FROM bots_transactions 
+ORDER BY id DESC 
+LIMIT 10;
+
+-- Rechercher par player_id dans le payload
+SELECT * FROM bots_transactions 
+WHERE payload->>'player_id' = '533938203';
+
+-- Rechercher par email dans le payload
+SELECT * FROM bots_transactions 
+WHERE payload->>'email' = 'player@example.com';
+
+-- Voir la structure du payload d'une transaction
+SELECT id, payload 
+FROM bots_transactions 
+WHERE id = 'votre-transaction-id';
+
+========================================
+➕ INSERTION (INSERT)
+========================================
+
+-- Insérer une nouvelle transaction PUBG
+INSERT INTO bots_transactions (id, bot_num, status, payload, bot_type) 
+VALUES (
+    'tx-' || extract(epoch from now())::text,
+    9,
+    'pending',
+    '{"player_id": "533938203", "code": "PUBGCODE123", "email": "player@example.com", "password": "playerpass"}',
+    'pubg'
+);
+
+-- Insérer une nouvelle transaction Yalla Ludo
+INSERT INTO bots_transactions (id, bot_num, status, payload, bot_type) 
+VALUES (
+    'tx-' || extract(epoch from now())::text,
+    5,
+    'pending',
+    '{"player_id": "987654321", "code": "YALLACODE456", "email": "yalla@example.com", "password": "yallapass"}',
+    'yalla_ludo'
+);
+
+-- Insérer plusieurs transactions en une fois
+INSERT INTO bots_transactions (id, bot_num, status, payload, bot_type) 
+VALUES 
+    ('tx-001', 9, 'pending', '{"player_id": "111111111", "code": "CODE1", "email": "user1@test.com", "password": "pass1"}', 'pubg'),
+    ('tx-002', 10, 'pending', '{"player_id": "222222222", "code": "CODE2", "email": "user2@test.com", "password": "pass2"}', 'pubg'),
+    ('tx-003', 3, 'pending', '{"player_id": "333333333", "code": "CODE3", "email": "user3@test.com", "password": "pass3"}', 'yalla_ludo');
+
+========================================
+✏️ MODIFICATION (UPDATE)
+========================================
+
+-- Mettre à jour le statut d'une transaction
+UPDATE bots_transactions 
+SET status = 'success' 
+WHERE id = 'votre-transaction-id';
+
+-- Mettre à jour le statut d'une transaction en échec
+UPDATE bots_transactions 
+SET status = 'failure' 
+WHERE id = 'votre-transaction-id';
+
+-- Mettre à jour le payload d'une transaction
+UPDATE bots_transactions 
+SET payload = '{"player_id": "999999999", "code": "NEWCODE", "email": "new@example.com", "password": "newpass"}'
+WHERE id = 'votre-transaction-id';
+
+-- Mettre à jour une partie du payload (garder le reste)
+UPDATE bots_transactions 
+SET payload = payload || '{"email": "updated@example.com"}'::jsonb
+WHERE id = 'votre-transaction-id';
+
+-- Mettre à jour le statut de plusieurs transactions
+UPDATE bots_transactions 
+SET status = 'success' 
+WHERE bot_num = 9 AND status = 'pending';
+
+-- Mettre à jour toutes les transactions d'un bot spécifique
+UPDATE bots_transactions 
+SET status = 'processing' 
+WHERE bot_num = 5 AND bot_type = 'yalla_ludo';
+
+========================================
+🗑️ SUPPRESSION (DELETE)
+========================================
+
+-- Supprimer une transaction spécifique
+DELETE FROM bots_transactions WHERE id = 'votre-transaction-id';
+
+-- Supprimer toutes les transactions réussies
+DELETE FROM bots_transactions WHERE status = 'success';
+
+-- Supprimer toutes les transactions échouées
+DELETE FROM bots_transactions WHERE status = 'failure';
+
+-- Supprimer les transactions d'un bot spécifique
+DELETE FROM bots_transactions WHERE bot_num = 9;
+
+-- Supprimer les transactions d'un type spécifique
+DELETE FROM bots_transactions WHERE bot_type = 'pubg';
+
+-- Supprimer les transactions avec des critères multiples
+DELETE FROM bots_transactions 
+WHERE bot_type = 'pubg' AND bot_num IN (9, 10) AND status = 'pending';
+
+-- Supprimer toutes les données (ATTENTION !)
+DELETE FROM bots_transactions;
+
+-- Supprimer les transactions anciennes (exemple : plus de 30 jours)
+DELETE FROM bots_transactions 
+WHERE id LIKE 'tx-%' 
+AND CAST(SPLIT_PART(id, '-', 2) AS BIGINT) < extract(epoch from now() - interval '30 days');
+
+========================================
+🔧 GESTION DE LA TABLE
+========================================
+
+-- Voir la structure de la table
+\d bots_transactions
+
+-- Voir les contraintes de la table
+SELECT 
+    conname as constraint_name,
+    contype as constraint_type,
+    pg_get_constraintdef(oid) as definition
+FROM pg_constraint 
+WHERE conrelid = 'bots_transactions'::regclass;
+
+-- Voir les index
+\di bots_transactions
+
+-- Créer un index sur une colonne spécifique
+CREATE INDEX IF NOT EXISTS idx_bots_transactions_player_id 
+ON bots_transactions USING GIN ((payload->>'player_id'));
+
+-- Supprimer un index
+DROP INDEX IF EXISTS idx_bots_transactions_player_id;
+
+-- Voir les statistiques de la table
+SELECT 
+    schemaname,
+    tablename,
+    attname,
+    n_distinct,
+    correlation
+FROM pg_stats 
+WHERE tablename = 'bots_transactions';
+
+========================================
+📊 REQUÊTES AVANCÉES
+========================================
+
+-- Statistiques par bot
+SELECT 
+    bot_num,
+    bot_type,
+    status,
+    COUNT(*) as count
+FROM bots_transactions 
+GROUP BY bot_num, bot_type, status
+ORDER BY bot_num, bot_type, status;
+
+-- Taux de réussite par bot
+SELECT 
+    bot_num,
+    bot_type,
+    COUNT(*) as total,
+    COUNT(CASE WHEN status = 'success' THEN 1 END) as successful,
+    ROUND(
+        COUNT(CASE WHEN status = 'success' THEN 1 END) * 100.0 / COUNT(*), 
+        2
+    ) as success_rate
+FROM bots_transactions 
+GROUP BY bot_num, bot_type
+ORDER BY bot_num;
+
+-- Transactions par heure (si vous avez des timestamps dans l'ID)
+SELECT 
+    DATE_TRUNC('hour', TO_TIMESTAMP(CAST(SPLIT_PART(id, '-', 2) AS BIGINT))) as hour,
+    COUNT(*) as transaction_count
+FROM bots_transactions 
+WHERE id LIKE 'tx-%'
+GROUP BY hour
+ORDER BY hour DESC
+LIMIT 24;
+
+-- Top 10 des player_id les plus actifs
+SELECT 
+    payload->>'player_id' as player_id,
+    COUNT(*) as transaction_count
+FROM bots_transactions 
+WHERE payload->>'player_id' IS NOT NULL
+GROUP BY payload->>'player_id'
+ORDER BY transaction_count DESC
+LIMIT 10;
+
+========================================
+🧪 COMMANDES DE TEST
+========================================
+
+-- Tester les contraintes (doit échouer)
+INSERT INTO bots_transactions (id, bot_num, status, payload, bot_type) 
+VALUES ('test-1', 15, 'pending', '{}', 'pubg'); -- bot_num > 10
+
+INSERT INTO bots_transactions (id, bot_num, status, payload, bot_type) 
+VALUES ('test-2', 5, 'pending', '{}', 'invalid_type'); -- bot_type invalide
+
+-- Insérer des données de test
+INSERT INTO bots_transactions (id, bot_num, status, payload, bot_type) 
+VALUES 
+    ('test-tx-1', 9, 'pending', '{"player_id": "TEST123", "code": "TESTCODE", "email": "test@test.com", "password": "testpass"}', 'pubg'),
+    ('test-tx-2', 5, 'pending', '{"player_id": "TEST456", "code": "TESTCODE2", "email": "test2@test.com", "password": "testpass2"}', 'yalla_ludo');
+
+-- Nettoyer les données de test
+DELETE FROM bots_transactions WHERE id LIKE 'test-%';
+
+========================================
+🔐 COMMANDES DE SÉCURITÉ
+========================================
+
+-- Créer une sauvegarde avant modification importante
+CREATE TABLE bots_transactions_backup AS 
+SELECT * FROM bots_transactions;
+
+-- Restaurer depuis une sauvegarde
+DELETE FROM bots_transactions;
+INSERT INTO bots_transactions SELECT * FROM bots_transactions_backup;
+
+-- Vérifier les permissions
+SELECT 
+    table_name,
+    privilege_type,
+    grantee
+FROM information_schema.table_privileges 
+WHERE table_name = 'bots_transactions';
+
+========================================
+📋 INFORMATIONS UTILES
+========================================
+
+Structure de la table bots_transactions:
+- id: VARCHAR (clé primaire)
+- bot_num: INTEGER (1-10)
+- status: VARCHAR ('pending', 'success', 'failure')
+- payload: JSONB ({player_id, code, email, password})
+- bot_type: VARCHAR ('yalla_ludo', 'pubg')
+
+Contraintes:
+- bot_num doit être entre 1 et 10
+- bot_type doit être 'yalla_ludo' ou 'pubg'
+
+Exemple de payload valide:
+{
+    "player_id": "533938203",
+    "code": "TESTCODE123",
+    "email": "player@example.com",
+    "password": "playerpassword"
+}
+
+========================================
+

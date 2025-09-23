@@ -1,187 +1,232 @@
-# 🎮 PUBG Recharge Bot API
+# 🤖 Glizer Bot Processor API v2.0
 
-Automated bot for PUBG Mobile recharges with simple and efficient REST API.
+Système d'automatisation pour les recharges PUBG Mobile spécialement conçu pour traiter les bots 9 et 10 via une base de données PostgreSQL externe.
 
-## 🚀 **Quick Installation**
+## 🚀 **Installation Rapide**
 
-### **1. Prerequisites**
+### **1. Prérequis**
 - Python 3.8+
-- Chrome/Chromium installed
-- ChromeDriver in PATH
+- Chrome/Chromium installé
+- ChromeDriver dans PATH
+- Base de données PostgreSQL accessible
 
 ### **2. Installation**
 ```bash
-# Clone the project
-git clone <-repo>
+# Cloner le projet
+git clone <repo>
 cd glizer-project
 
-# Install dependencies
+# Installer les dépendances
 pip install -r requirements.txt
 ```
 
-### **3. Startup**
+### **3. Configuration**
+```bash
+# Copier le fichier d'environnement
+cp src/env.example src/.env
+
+# Éditer les variables PostgreSQL
+nano src/.env
+```
+
+### **4. Configuration des Credentials**
+```bash
+# Éditer le fichier de credentials
+nano src/config/credentials.json
+```
+
+### **5. Démarrage**
 ```bash
 cd src
 python main.py
 ```
 
-API will be available at: `http://localhost:8000`
+L'API sera disponible sur : `http://localhost:8000`
 
 ## 📡 **API Endpoints**
 
-### **Create a Transaction**
-```bash
-curl -X POST "http://localhost:8000/transaction/create" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "your@email.com",
-    "password": "your_password",
-    "player_id": "123456789",
-    "redeem_codes": ["CODE1"]
-  }'
-```
-
-**Response:**
-```json
-{
-  "transaction_id": "transaction-uuid",
-  "status": "pending",
-  "message": "Transaction created and queued for processing"
-}
-```
-
-### **Check Transaction Status**
-```bash
-curl "http://localhost:8000/transaction/{transaction_id}"
-```
-
-**Response:**
-```json
-{
-  "transaction_id": "transaction-uuid",
-  "status": "success",
-  "created_at": "2024-01-15T10:30:00",
-  "started_at": "2024-01-15T10:30:05",
-  "completed_at": "2024-01-15T10:32:15",
-  "retry_count": 0,
-  "max_retries": 3,
-  "result": {
-    "CODE1": true,
-    "CODE2": true,
-    "CODE3": false
-  },
-  "error_message": null
-}
-```
-
-### **List Transactions**
-```bash
-curl "http://localhost:8000/transactions?limit=50"
-```
-
-### **System Statistics**
-```bash
-curl "http://localhost:8000/stats"
-```
-
-**Response:**
-```json
-{
-  "total_transactions": 150,
-  "success_rate": 75.5,
-  "status_breakdown": {
-    "pending": 5,      // Pending
-    "processing": 2,   // Processing
-    "success": 110,    // Successful
-    "failed": 33       // Failed after 3 attempts
-  },
-  "thread_manager": {
-    "running": true,
-    "active_threads": 1,
-    "max_workers": 1,
-    "pending_transactions": 5,
-    "processing_transactions": 2
-  }
-}
-```
-
-### **Reset Database**
-```bash
-curl -X POST "http://localhost:8000/reset-database"
-```
-
-### **Check System Health**
+### **Vérification de Santé**
 ```bash
 curl "http://localhost:8000/health"
 ```
 
-## 📊 **Transaction Statuses**
+### **Statistiques des Bots**
+```bash
+curl "http://localhost:8000/stats"
+```
 
-| Status | Description |
-|--------|-------------|
-| `pending` | Pending processing |
-| `processing` | Currently executing |
-| `success` | Successful (even partially) |
-| `failed` | Failed after 3 attempts |
+### **Statistiques d'un Bot Spécifique**
+```bash
+curl "http://localhost:8000/bot/9/stats"
+curl "http://localhost:8000/bot/10/stats"
+```
 
-## 🔄 **Retry System**
+### **Lister les Transactions**
+```bash
+# Toutes les transactions
+curl "http://localhost:8000/transactions"
 
-- **Maximum 3 attempts** per transaction
-- **Automatic retry** in case of temporary failure
-- **Partial success**: If 2 out of 3 codes succeed, the transaction is marked as `success`
+# Transactions d'un bot spécifique
+curl "http://localhost:8000/transactions?bot_num=9"
 
-## 📁 **Project Structure**
+# Transactions par statut
+curl "http://localhost:8000/transactions?status=pending"
+```
+
+### **Statut d'une Transaction**
+```bash
+curl "http://localhost:8000/transaction/{transaction_id}"
+```
+
+### **Traiter une Transaction Manuellement**
+```bash
+curl -X POST "http://localhost:8000/transaction/{transaction_id}/process"
+```
+
+### **Traiter Toutes les Transactions en Attente**
+```bash
+curl -X POST "http://localhost:8000/process/pending"
+```
+
+### **Vérifier les Credentials**
+```bash
+curl "http://localhost:8000/credentials/status"
+```
+
+## 🔧 **Configuration**
+
+### **Variables d'Environnement**
+```env
+# PostgreSQL
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DB=glizer_db
+POSTGRES_USER=glizer_user
+POSTGRES_PASSWORD=glizer_pass
+
+# API
+PORT=8000
+LOG_LEVEL=INFO
+```
+
+### **Credentials des Bots**
+```json
+{
+  "bots": {
+    "9": {
+      "email": "bot9@example.com",
+      "password": "password123"
+    },
+    "10": {
+      "email": "bot10@example.com", 
+      "password": "password456"
+    }
+  }
+}
+```
+
+## 📊 **Structure de la Base de Données**
+
+### **Table bots_transactions**
+```sql
+CREATE TABLE bots_transactions (
+    id VARCHAR PRIMARY KEY,
+    bot_num INTEGER NOT NULL,
+    status VARCHAR DEFAULT 'pending',
+    payload JSONB,
+    bot_type VARCHAR DEFAULT 'pubg',
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    started_at TIMESTAMP,
+    completed_at TIMESTAMP,
+    error_message TEXT,
+    retry_count INTEGER DEFAULT 0,
+    max_retries INTEGER DEFAULT 3
+);
+```
+
+### **Format du Payload**
+```json
+{
+  "player_id": "533938203",
+  "codes": ["CODE1", "CODE2", "CODE3"]
+}
+```
+
+## 🔄 **Workflow**
+
+1. **Polling** : Le système vérifie la base PostgreSQL toutes les 30 secondes
+2. **Filtrage** : Seules les transactions avec `bot_num IN (9, 10)` et `bot_type = "pubg"` sont traitées
+3. **Traitement** : Chaque bot a son worker dédié pour le traitement en parallèle
+4. **Authentification** : Utilise les credentials spécifiques à chaque bot
+5. **Mise à jour** : Met à jour le statut : `pending → processing → success/failed`
+
+## 📁 **Architecture**
 
 ```
 glizer-project/
 ├── src/
-│   ├── main.py              # Main FastAPI application
-│   ├── models.py            # Database models
-│   ├── database.py          # SQLite configuration
-│   ├── thread_manager.py    # Thread manager
-│   ├── schemas.py           # Pydantic schemas
-│   ├── pubg_automation.py   # Service wrapper
+│   ├── config/
+│   │   └── credentials.json      # Credentials des bots
+│   ├── database/
+│   │   ├── postgresql.py         # Connexion PostgreSQL
+│   │   └── models.py             # Modèles adaptés
+│   ├── services/
+│   │   ├── bot_poller.py         # Service de polling
+│   │   └── transaction_processor.py # Traitement des transactions
 │   ├── pubg/
-│   │   └── service.py       # Selenium service
-│   └── clean_database.py    # Cleanup script
-├── data/                    # SQLite database
-├── screenshots/             # Debug screenshots
-├── user-data/               # Chrome user data by email
-├── requirements.txt         # Python dependencies
-└── README.md               # This file
+│   │   └── service.py            # Selenium (inchangé)
+│   ├── main.py                   # Point d'entrée FastAPI
+│   ├── thread_manager.py         # Gestionnaire de threads
+│   ├── schemas.py                # Schémas Pydantic
+│   └── pubg_automation.py        # Wrapper Selenium
+├── requirements.txt              # Dépendances Python
+└── README.md                    # Ce fichier
 ```
 
+## ⚡ **Fonctionnalités**
 
+- ✅ **Traitement en Parallèle** : Workers dédiés pour bots 9 et 10
+- ✅ **Polling Intelligent** : Surveillance continue de PostgreSQL
+- ✅ **Retry Automatique** : 3 tentatives maximum par transaction
+- ✅ **Credentials Séparés** : Configuration par bot
+- ✅ **Logging Détaillé** : Suivi complet des opérations
+- ✅ **API REST** : Interface complète pour monitoring
+- ✅ **Gestion d'Erreurs** : Robustesse et récupération automatique
 
-## 🔧 **Configuration**
+## 📝 **Logs et Debug**
 
-### **Environment Variables (optional)**
-Create a `.env` file in the `src/` folder:
-```env
-PORT=8000
-LOG_LEVEL=INFO
-DATABASE_URL=sqlite:///./data/transactions.db
-```
+- **Logs** : Affichés dans le terminal avec timestamps
+- **Screenshots** : Sauvegardées dans `screenshots/`
+- **Base de Données** : Toutes les opérations trackées dans PostgreSQL
 
-### **Database Cleanup**
-```bash
-cd src
-python clean_database.py stats          # View statistics
-python clean_database.py clean-failed   # Remove failed transactions
-python clean_database.py clean-all      # Remove everything
-```
+## 🔒 **Sécurité**
 
-## 📝 **Logs and Debug**
+- Credentials stockés dans un fichier JSON séparé
+- Connexions PostgreSQL sécurisées
+- Gestion des erreurs sans exposition de données sensibles
+- Logs sanitaires (pas de mots de passe exposés)
 
-- **Logs**: Displayed in terminal
-- **Screenshots**: Saved in `screenshots/`
-- **Database**: `data/transactions.db`
+## 🚨 **Statuts des Transactions**
 
-## ⚡ **Performance**
+| Statut | Description |
+|--------|-------------|
+| `pending` | En attente de traitement |
+| `processing` | En cours d'exécution |
+| `success` | Réussie (complète ou partielle) |
+| `failed` | Échouée après 3 tentatives |
 
-- **1 worker** processes transactions in FIFO order
-- **Shared user data** for the same email
-- **Intelligent retry** with backoff
-- **Optimized database** with SQLite
+## 🔄 **Système de Retry**
 
+- **Maximum 3 tentatives** par transaction
+- **Retry automatique** en cas d'échec temporaire
+- **Succès partiel** : Si au moins 1 code sur plusieurs réussit, la transaction est marquée comme `success`
 
+## 📈 **Monitoring**
+
+Utilisez les endpoints API pour surveiller :
+- État de santé du système
+- Statistiques par bot
+- Transactions en cours
+- Taux de succès
+- Workers actifs

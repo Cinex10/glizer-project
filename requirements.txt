@@ -5,3 +5,4 @@ sqlalchemy==2.0.41
 python-dotenv==1.1.1
 selenium==4.34.2
 requests==2.32.4
+psycopg2-binary==2.9.9
