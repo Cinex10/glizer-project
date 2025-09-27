@@ -1,232 +1,359 @@
-# 🤖 Glizer Bot Processor API v2.0
+# 🎮 Glizer Bot Processor API v2.0
 
-Système d'automatisation pour les recharges PUBG Mobile spécialement conçu pour traiter les bots 9 et 10 via une base de données PostgreSQL externe.
+**Système automatisé de recharge UC PUBG avec rotation intelligente des credentials**
 
-## 🚀 **Installation Rapide**
+## 📋 Description
 
-### **1. Prérequis**
+Glizer Bot Processor est une API FastAPI qui automatise le processus de recharge d'UC (Unknown Cash) pour PUBG Mobile via MidasBuy. Le système gère 10 bots simultanément avec une rotation automatique des credentials pour optimiser les performances et éviter les limitations.
+
+### ✨ Fonctionnalités principales
+
+- 🤖 **10 bots simultanés** : Traitement parallèle pour les bots 1-10
+- 🔄 **Rotation automatique des credentials** : Gestion intelligente de 200+ comptes
+- 🎯 **Support PUBG Mobile** : Intégration complète avec MidasBuy
+- 📊 **Monitoring en temps réel** : Statistiques détaillées et suivi des transactions
+- 🛡️ **Gestion d'erreurs robuste** : Retry automatique et classification des échecs
+- 🗄️ **Base de données PostgreSQL** : Persistance et historique des transactions
+- 📱 **API REST complète** : Interface pour intégration externe
+
+## 🏗️ Architecture
+
+```
+glizer-project/
+├── src/
+│   ├── main.py                 # Point d'entrée FastAPI
+│   ├── database/
+│   │   ├── models.py          # Modèles SQLAlchemy
+│   │   └── postgresql.py      # Configuration PostgreSQL
+│   ├── services/
+│   │   ├── transaction_processor.py  # Processeur principal
+│   │   ├── credential_manager.py     # Gestion des credentials
+│   │   └── bot_poller.py            # Polling des transactions
+│   ├── pubg/
+│   │   └── service.py         # Service d'automatisation PUBG
+│   ├── config/
+│   │   └── accounts.json      # 200+ credentials rotatifs
+│   └── schemas.py             # Modèles Pydantic
+├── requirements.txt           # Dépendances Python
+├── init_database.py          # Script d'initialisation DB
+└── create_table.sql          # Schéma de base de données
+```
+
+## 🚀 Installation et Configuration
+
+### 1. Prérequis
+
 - Python 3.8+
-- Chrome/Chromium installé
-- ChromeDriver dans PATH
-- Base de données PostgreSQL accessible
+- PostgreSQL 12+
+- Chrome/Chromium
+- ChromeDriver
 
-### **2. Installation**
+### 2. Installation
+
 ```bash
 # Cloner le projet
-git clone <repo>
+git clone <repository-url>
 cd glizer-project
+
+# Créer l'environnement virtuel
+python3 -m venv mon_env
+source mon_env/bin/activate  # Linux/Mac
+# ou
+mon_env\Scripts\activate     # Windows
 
 # Installer les dépendances
 pip install -r requirements.txt
 ```
 
-### **3. Configuration**
-```bash
-# Copier le fichier d'environnement
-cp src/env.example src/.env
+### 3. Configuration PostgreSQL
 
-# Éditer les variables PostgreSQL
-nano src/.env
+```bash
+# Créer la base de données
+sudo -u postgres psql
+CREATE DATABASE glizer_db;
+CREATE USER glizer_user WITH PASSWORD 'glizer_pass';
+GRANT ALL PRIVILEGES ON DATABASE glizer_db TO glizer_user;
+\q
 ```
 
-### **4. Configuration des Credentials**
+### 4. Configuration des variables d'environnement
+
 ```bash
-# Éditer le fichier de credentials
-nano src/config/credentials.json
+# Copier le fichier d'exemple
+cp src/env.example .env
+
+# Éditer les variables
+nano .env
 ```
 
-### **5. Démarrage**
-```bash
-cd src
-python main.py
-```
-
-L'API sera disponible sur : `http://localhost:8000`
-
-## 📡 **API Endpoints**
-
-### **Vérification de Santé**
-```bash
-curl "http://localhost:8000/health"
-```
-
-### **Statistiques des Bots**
-```bash
-curl "http://localhost:8000/stats"
-```
-
-### **Statistiques d'un Bot Spécifique**
-```bash
-curl "http://localhost:8000/bot/9/stats"
-curl "http://localhost:8000/bot/10/stats"
-```
-
-### **Lister les Transactions**
-```bash
-# Toutes les transactions
-curl "http://localhost:8000/transactions"
-
-# Transactions d'un bot spécifique
-curl "http://localhost:8000/transactions?bot_num=9"
-
-# Transactions par statut
-curl "http://localhost:8000/transactions?status=pending"
-```
-
-### **Statut d'une Transaction**
-```bash
-curl "http://localhost:8000/transaction/{transaction_id}"
-```
-
-### **Traiter une Transaction Manuellement**
-```bash
-curl -X POST "http://localhost:8000/transaction/{transaction_id}/process"
-```
-
-### **Traiter Toutes les Transactions en Attente**
-```bash
-curl -X POST "http://localhost:8000/process/pending"
-```
-
-### **Vérifier les Credentials**
-```bash
-curl "http://localhost:8000/credentials/status"
-```
-
-## 🔧 **Configuration**
-
-### **Variables d'Environnement**
+**Configuration `.env` :**
 ```env
-# PostgreSQL
+# Configuration PostgreSQL
 POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
 POSTGRES_DB=glizer_db
 POSTGRES_USER=glizer_user
 POSTGRES_PASSWORD=glizer_pass
 
-# API
+# Configuration API
 PORT=8000
 LOG_LEVEL=INFO
+
+# Configuration des workers
+MAX_WORKERS=10
+POLL_INTERVAL=30
 ```
 
-### **Credentials des Bots**
-```json
-{
-  "bots": {
-    "9": {
-      "email": "bot9@example.com",
-      "password": "password123"
-    },
-    "10": {
-      "email": "bot10@example.com", 
-      "password": "password456"
-    }
-  }
-}
+### 5. Initialisation de la base de données
+
+```bash
+# Créer les tables
+python3 init_database.py
+
+# Ou avec des données d'exemple
+python3 init_database.py --with-samples
 ```
 
-## 📊 **Structure de la Base de Données**
+## 🎯 Utilisation
 
-### **Table bots_transactions**
-```sql
-CREATE TABLE bots_transactions (
-    id VARCHAR PRIMARY KEY,
-    bot_num INTEGER NOT NULL,
-    status VARCHAR DEFAULT 'pending',
-    payload JSONB,
-    bot_type VARCHAR DEFAULT 'pubg',
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW(),
-    started_at TIMESTAMP,
-    completed_at TIMESTAMP,
-    error_message TEXT,
-    retry_count INTEGER DEFAULT 0,
-    max_retries INTEGER DEFAULT 3
-);
+### Démarrage de l'API
+
+```bash
+# Activer l'environnement virtuel
+source mon_env/bin/activate
+
+# Démarrer l'API
+cd src
+python3 main.py
 ```
 
-### **Format du Payload**
-```json
-{
-  "player_id": "533938203",
-  "codes": ["CODE1", "CODE2", "CODE3"]
-}
+L'API sera disponible sur `http://localhost:8000`
+
+### Documentation interactive
+
+- **Swagger UI** : `http://localhost:8000/docs`
+- **ReDoc** : `http://localhost:8000/redoc`
+
+## 📡 Endpoints API
+
+### 🏥 Santé et Monitoring
+
+```http
+GET /health
+GET /stats
+GET /bot/{bot_num}/stats
 ```
 
-## 🔄 **Workflow**
+### 📋 Gestion des Transactions
 
-1. **Polling** : Le système vérifie la base PostgreSQL toutes les 30 secondes
-2. **Filtrage** : Seules les transactions avec `bot_num IN (9, 10)` et `bot_type = "pubg"` sont traitées
-3. **Traitement** : Chaque bot a son worker dédié pour le traitement en parallèle
-4. **Authentification** : Utilise les credentials spécifiques à chaque bot
-5. **Mise à jour** : Met à jour le statut : `pending → processing → success/failed`
-
-## 📁 **Architecture**
-
-```
-glizer-project/
-├── src/
-│   ├── config/
-│   │   └── credentials.json      # Credentials des bots
-│   ├── database/
-│   │   ├── postgresql.py         # Connexion PostgreSQL
-│   │   └── models.py             # Modèles adaptés
-│   ├── services/
-│   │   ├── bot_poller.py         # Service de polling
-│   │   └── transaction_processor.py # Traitement des transactions
-│   ├── pubg/
-│   │   └── service.py            # Selenium (inchangé)
-│   ├── main.py                   # Point d'entrée FastAPI
-│   ├── thread_manager.py         # Gestionnaire de threads
-│   ├── schemas.py                # Schémas Pydantic
-│   └── pubg_automation.py        # Wrapper Selenium
-├── requirements.txt              # Dépendances Python
-└── README.md                    # Ce fichier
+```http
+GET /transactions?bot_num=9&status=pending&limit=50
+GET /transaction/{transaction_id}
+POST /transaction/{transaction_id}/process
+POST /process/pending
 ```
 
-## ⚡ **Fonctionnalités**
+### 🔐 Gestion des Credentials
 
-- ✅ **Traitement en Parallèle** : Workers dédiés pour bots 9 et 10
-- ✅ **Polling Intelligent** : Surveillance continue de PostgreSQL
-- ✅ **Retry Automatique** : 3 tentatives maximum par transaction
-- ✅ **Credentials Séparés** : Configuration par bot
-- ✅ **Logging Détaillé** : Suivi complet des opérations
-- ✅ **API REST** : Interface complète pour monitoring
-- ✅ **Gestion d'Erreurs** : Robustesse et récupération automatique
+```http
+GET /credentials/status
+POST /credentials/rotate
+POST /credentials/reset?index=0
+```
 
-## 📝 **Logs et Debug**
+### 📧 Gestion des Emails
 
-- **Logs** : Affichés dans le terminal avec timestamps
-- **Screenshots** : Sauvegardées dans `screenshots/`
-- **Base de Données** : Toutes les opérations trackées dans PostgreSQL
+```http
+GET /emails/status
+POST /emails/release-all
+```
 
-## 🔒 **Sécurité**
+### ⚙️ Maintenance
 
-- Credentials stockés dans un fichier JSON séparé
-- Connexions PostgreSQL sécurisées
-- Gestion des erreurs sans exposition de données sensibles
-- Logs sanitaires (pas de mots de passe exposés)
+```http
+GET /queue/status
+POST /queue/clear-processing
+GET /queue/processing/{transaction_id}
+```
 
-## 🚨 **Statuts des Transactions**
+## 🔧 Ajout de Transactions
 
-| Statut | Description |
-|--------|-------------|
-| `pending` | En attente de traitement |
-| `processing` | En cours d'exécution |
-| `success` | Réussie (complète ou partielle) |
-| `failed` | Échouée après 3 tentatives |
+### Via l'API
 
-## 🔄 **Système de Retry**
+```bash
+# Ajouter une transaction
+curl -X POST "http://localhost:8000/transaction" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "bot_num": 9,
+    "player_id": "533938203",
+    "code": "UCCODE123",
+    "email": "player@example.com",
+    "password": "playerpass"
+  }'
+```
 
-- **Maximum 3 tentatives** par transaction
-- **Retry automatique** en cas d'échec temporaire
-- **Succès partiel** : Si au moins 1 code sur plusieurs réussit, la transaction est marquée comme `success`
+### Via le script
 
-## 📈 **Monitoring**
+```bash
+# Ajouter une transaction
+python3 add_transaction.py add 9 533938203 "UCCODE123" player@example.com playerpass
 
-Utilisez les endpoints API pour surveiller :
-- État de santé du système
-- Statistiques par bot
-- Transactions en cours
-- Taux de succès
-- Workers actifs
+# Lister les transactions
+python3 add_transaction.py list
+
+# Voir les statistiques
+python3 add_transaction.py stats
+```
+
+## 🎮 Fonctionnement du Bot PUBG
+
+### Processus d'automatisation
+
+1. **Connexion** : Le bot se connecte à MidasBuy avec les credentials rotatifs
+2. **Authentification** : Login automatique avec email/password
+3. **Sélection du joueur** : Changement vers le Player ID cible
+4. **Rédemption** : Saisie et validation du code UC
+5. **Vérification** : Confirmation du succès ou échec
+6. **Rotation** : Passage au credential suivant
+
+### Types d'erreurs gérées
+
+- `wrong_player_id` : Player ID incorrect
+- `wrong_code` : Code de rédemption invalide
+- `wrong_item_type` : Type d'item incorrect
+- `wrong_amount` : Montant incorrect
+- `wrong_email_password` : Credentials invalides
+- `other` : Autres erreurs
+
+## 📊 Monitoring et Statistiques
+
+### Dashboard en temps réel
+
+```bash
+# Statistiques globales
+curl http://localhost:8000/stats
+
+# Statistiques par bot
+curl http://localhost:8000/bot/9/stats
+
+# Statut des credentials
+curl http://localhost:8000/credentials/status
+```
+
+### Logs
+
+Les logs sont disponibles dans le dossier `logs/` avec rotation automatique.
+
+## 🔄 Rotation des Credentials
+
+Le système gère automatiquement 200+ comptes avec :
+
+- **Rotation intelligente** : Passage automatique au credential suivant
+- **Gestion des limites** : Évite les blocages par surutilisation
+- **Monitoring** : Suivi de l'utilisation de chaque credential
+- **Récupération** : Libération automatique des emails bloqués
+
+## 🛠️ Maintenance
+
+### Nettoyage des transactions
+
+```bash
+# Nettoyer les transactions en cours
+curl -X POST http://localhost:8000/queue/clear-processing
+
+# Libérer tous les emails
+curl -X POST http://localhost:8000/emails/release-all
+```
+
+### Redémarrage propre
+
+```bash
+# Arrêt gracieux
+pkill -f "python3 main.py"
+
+# Redémarrage
+cd src && python3 main.py
+```
+
+## 🐳 Déploiement Docker (Optionnel)
+
+```dockerfile
+FROM python:3.9-slim
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+COPY . .
+EXPOSE 8000
+
+CMD ["python3", "src/main.py"]
+```
+
+```bash
+# Build et run
+docker build -t glizer-api .
+docker run -p 8000:8000 --env-file .env glizer-api
+```
+
+## 🔒 Sécurité
+
+- **Credentials chiffrés** : Stockage sécurisé des mots de passe
+- **Rotation automatique** : Réduction des risques de détection
+- **Logs sécurisés** : Pas de credentials dans les logs
+- **Validation stricte** : Contrôles sur tous les inputs
+
+## 📈 Performance
+
+- **10 workers simultanés** : Traitement parallèle optimisé
+- **Base de données indexée** : Requêtes rapides
+- **Gestion mémoire** : Optimisation des ressources
+- **Retry intelligent** : Gestion des échecs temporaires
+
+## 🆘 Dépannage
+
+### Problèmes courants
+
+1. **Erreur de connexion PostgreSQL**
+   ```bash
+   # Vérifier la configuration
+   psql -h localhost -U glizer_user -d glizer_db
+   ```
+
+2. **ChromeDriver manquant**
+   ```bash
+   # Installer ChromeDriver
+   sudo apt-get install chromium-chromedriver
+   ```
+
+3. **Credentials épuisés**
+   ```bash
+   # Vérifier le statut
+   curl http://localhost:8000/credentials/status
+   ```
+
+### Logs de debug
+
+```bash
+# Activer les logs détaillés
+export LOG_LEVEL=DEBUG
+python3 src/main.py
+```
+
+## 📞 Support
+
+Pour toute question ou problème :
+
+1. Vérifier les logs dans `logs/`
+2. Consulter l'API `/health` et `/stats`
+3. Vérifier la configuration PostgreSQL
+4. Tester avec des données d'exemple
+
+## 📄 Licence
+
+Projet privé - Tous droits réservés
+
+---
+
+**Glizer Bot Processor v2.0** - Automatisation PUBG UC avec rotation intelligente des credentials

@@ -134,7 +134,7 @@ WHERE id = 'votre-transaction-id';
 INSERT INTO bots_transactions (id, bot_num, status, payload, bot_type) 
 VALUES (
     'tx-' || extract(epoch from now())::text,
-    9,
+    4,
     'pending',
     '{"player_id": "533938203", "code": "PUBGCODE123", "email": "player@example.com", "password": "playerpass"}',
     'pubg'

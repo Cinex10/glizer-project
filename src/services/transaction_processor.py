@@ -48,8 +48,8 @@ class TransactionProcessor:
         logger.info(f"Transaction {transaction.id}: Using credential {cred_id} ({email})")
         
         try:
-            # Marquer comme en cours de traitement
-            self.poller.mark_processing(transaction.id)
+            # Ne plus marquer comme processing - passer directement au traitement
+            # self.poller.mark_processing(transaction.id)  # SUPPRIMÉ
             
             # Extraire les données du payload (nouveau format Salla)
             player_id = transaction.get_player_id()
@@ -84,12 +84,20 @@ class TransactionProcessor:
                 error_msg = f"PUBG automation failed: {str(automation_error)}"
                 logger.error(f"Transaction {transaction.id}: {error_msg}")
                 
-                self.poller.mark_failed(transaction.id, error_msg, increment_retry=True)
+                # Extraire le type d'erreur du message
+                failure_reason = "other"
+                if "|" in str(automation_error):
+                    parts = str(automation_error).split("|")
+                    if len(parts) > 1:
+                        failure_reason = parts[-1].strip()
+                
+                self.poller.mark_failed(transaction.id, error_msg, increment_retry=True, failure_reason=failure_reason)
                 self.credential_manager.mark_credential_failed(credential_index)
                 
                 return {
                     "status": "failed",
                     "error": error_msg,
+                    "failure_reason": failure_reason,
                     "message": f"Automation failed: {str(automation_error)}",
                     "credential_used": {
                         "id": cred_id,
@@ -154,12 +162,32 @@ class TransactionProcessor:
             else:
                 # Échec complet - aucun code n'a réussi
                 error_msg = f"All {total_codes} codes failed (Success: {success_count}, Failed: {failed_count}, Errors: {error_count})"
-                self.poller.mark_failed(transaction.id, error_msg, increment_retry=True)
+                # Déterminer le type d'erreur le plus probable basé sur les résultats
+                failure_reason = "other"
+                if error_count > 0:
+                    # Analyser les erreurs pour déterminer le type
+                    for code, status in result.items():
+                        if isinstance(status, str):
+                            if "player" in status.lower() or "معرف" in status:
+                                failure_reason = "wrong_player_id"
+                                break
+                            elif "code" in status.lower() or "رمز" in status:
+                                failure_reason = "wrong_code"
+                                break
+                            elif "item" in status.lower() or "عنصر" in status:
+                                failure_reason = "wrong_item_type"
+                                break
+                            elif "amount" in status.lower() or "كمية" in status:
+                                failure_reason = "wrong_amount"
+                                break
+                
+                self.poller.mark_failed(transaction.id, error_msg, increment_retry=True, failure_reason=failure_reason)
                 self.credential_manager.mark_credential_failed(credential_index)
                 logger.error(f"Transaction {transaction.id} failed completely with credential {cred_id}: {error_msg}")
                 return {
                     "status": "failed",
                     "result": result,
+                    "failure_reason": failure_reason,
                     "message": error_msg,
                     "credential_used": {
                         "id": cred_id,
@@ -172,15 +200,23 @@ class TransactionProcessor:
             error_msg = str(e)
             logger.error(f"Transaction {transaction.id} processing failed with credential {cred_id}: {error_msg}")
             
+            # Extraire le type d'erreur du message
+            failure_reason = "other"
+            if "|" in error_msg:
+                parts = error_msg.split("|")
+                if len(parts) > 1:
+                    failure_reason = parts[-1].strip()
+            
             # Marquer le credential comme échoué
             self.credential_manager.mark_credential_failed(credential_index)
             
             # Marquer la transaction comme échouée avec retry
-            self.poller.mark_failed(transaction.id, error_msg, increment_retry=True)
+            self.poller.mark_failed(transaction.id, error_msg, increment_retry=True, failure_reason=failure_reason)
             
             return {
                 "status": "error",
                 "error": error_msg,
+                "failure_reason": failure_reason,
                 "message": f"Processing failed: {error_msg}",
                 "credential_used": {
                     "id": cred_id,
@@ -262,17 +298,31 @@ class TransactionProcessor:
         Returns:
             Statistiques complètes
         """
-        bot_9_stats = self.poller.get_bot_stats(9)
-        bot_10_stats = self.poller.get_bot_stats(10)
+        # Obtenir les statistiques pour tous les bots (1-10)
+        all_bots_stats = {}
+        total_pending = 0
+        total_processing = 0  # Toujours 0 maintenant
+        total_success = 0
+        total_failed = 0
+        
+        for bot_num in range(1, 11):  # bots 1 à 10
+            bot_stats = self.poller.get_bot_stats(bot_num)
+            all_bots_stats[f"bot_{bot_num}"] = bot_stats
+            
+            # Accumuler les totaux (sans processing)
+            total_pending += bot_stats.get("pending", 0)
+            total_processing += 0  # Toujours 0
+            total_success += bot_stats.get("success", 0)
+            total_failed += bot_stats.get("failed", 0)
+        
         credential_stats = self.credential_manager.get_usage_stats()
         
         return {
-            "bot_9": bot_9_stats,
-            "bot_10": bot_10_stats,
-            "total_pending": bot_9_stats.get("pending", 0) + bot_10_stats.get("pending", 0),
-            "total_processing": bot_9_stats.get("processing", 0) + bot_10_stats.get("processing", 0),
-            "total_success": bot_9_stats.get("success", 0) + bot_10_stats.get("success", 0),
-            "total_failed": bot_9_stats.get("failed", 0) + bot_10_stats.get("failed", 0),
+            "all_bots": all_bots_stats,
+            "total_pending": total_pending,
+            "total_processing": total_processing,
+            "total_success": total_success,
+            "total_failed": total_failed,
             "credential_rotation": {
                 "current_position": credential_stats["current_position"],
                 "total_credentials": credential_stats["total_credentials"],

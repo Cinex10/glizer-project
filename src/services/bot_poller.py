@@ -1,5 +1,5 @@
 """
-Service de polling pour surveiller les transactions des bots 9 et 10
+Service de polling pour surveiller les transactions de tous les bots (1-10)
 """
 import time
 import json
@@ -28,60 +28,27 @@ class BotPoller:
     
     def get_pending_transactions(self) -> List[BotTransaction]:
         """
-        Récupérer les transactions en attente pour les bots 9 et 10
+        Récupérer les transactions en attente pour tous les bots (1-10)
+        Ne récupère que les transactions "pending" (plus de "processing")
         
         Returns:
             Liste des transactions PUBG en attente
         """
         session = self.SessionLocal()
         try:
-            # Récupérer les transactions PUBG des bots 9 et 10 en attente
+            # Récupérer les transactions PUBG de tous les bots (1-10) en attente uniquement
             transactions = session.query(BotTransaction).filter(
-                BotTransaction.bot_num.in_([9, 10]),
+                BotTransaction.bot_num.in_(list(range(1, 11))),  # bots 1 à 10
                 BotTransaction.bot_type == "pubg",
-                BotTransaction.status == "pending"
+                BotTransaction.status == "pending"  # Seulement pending, plus de processing
             ).order_by(BotTransaction.created_at.asc()).all()
             
-            logger.info(f"Found {len(transactions)} pending transactions for bots 9 and 10")
+            logger.info(f"Found {len(transactions)} pending transactions for all bots (1-10)")
             return transactions
             
         except Exception as e:
             logger.error(f"Error fetching pending transactions: {e}")
             return []
-        finally:
-            session.close()
-    
-    def mark_processing(self, transaction_id: str) -> bool:
-        """
-        Marquer une transaction comme en cours de traitement
-        
-        Args:
-            transaction_id: ID de la transaction
-            
-        Returns:
-            True si la mise à jour a réussi
-        """
-        session = self.SessionLocal()
-        try:
-            transaction = session.query(BotTransaction).filter(
-                BotTransaction.id == transaction_id
-            ).first()
-            
-            if transaction:
-                transaction.status = "processing"
-                transaction.started_at = datetime.utcnow()
-                transaction.updated_at = datetime.utcnow()
-                session.commit()
-                logger.info(f"Transaction {transaction_id} marked as processing")
-                return True
-            else:
-                logger.warning(f"Transaction {transaction_id} not found")
-                return False
-                
-        except Exception as e:
-            logger.error(f"Error marking transaction {transaction_id} as processing: {e}")
-            session.rollback()
-            return False
         finally:
             session.close()
     
@@ -125,7 +92,7 @@ class BotPoller:
         finally:
             session.close()
     
-    def mark_failed(self, transaction_id: str, error_message: str = None, increment_retry: bool = True) -> bool:
+    def mark_failed(self, transaction_id: str, error_message: str = None, increment_retry: bool = True, failure_reason: str = None) -> bool:
         """
         Marquer une transaction comme échouée
         
@@ -133,6 +100,7 @@ class BotPoller:
             transaction_id: ID de la transaction
             error_message: Message d'erreur
             increment_retry: Incrémenter le compteur de retry
+            failure_reason: Raison de l'échec (wrong_player_id, wrong_code, wrong_item_type, wrong_amount, wrong_email_password, other)
             
         Returns:
             True si la mise à jour a réussi
@@ -147,6 +115,10 @@ class BotPoller:
                 # Marquer directement comme failed (pas de retry dans la nouvelle architecture)
                 transaction.status = "failure"
                 
+                # Ajouter la raison de l'échec
+                if failure_reason:
+                    transaction.failure_reason = failure_reason
+                
                 # Ajouter le message d'erreur dans le payload
                 if error_message:
                     current_payload = transaction.payload or {}
@@ -154,7 +126,7 @@ class BotPoller:
                     transaction.payload = current_payload
                 session.commit()
                 
-                logger.info(f"Transaction {transaction_id} marked as failed")
+                logger.info(f"Transaction {transaction_id} marked as failed with reason: {failure_reason}")
                 return True
             else:
                 logger.warning(f"Transaction {transaction_id} not found")
@@ -170,25 +142,24 @@ class BotPoller:
     def get_bot_stats(self, bot_num: int) -> dict:
         """
         Obtenir les statistiques d'un bot
+        Ne compte plus les transactions "processing"
         
         Args:
-            bot_num: Numéro du bot (9 ou 10)
+            bot_num: Numéro du bot (1-10)
             
         Returns:
             Dictionnaire avec les statistiques
         """
         session = self.SessionLocal()
         try:
-            # Compter les transactions par statut
+            # Compter les transactions par statut (sans processing)
             pending = session.query(BotTransaction).filter(
                 BotTransaction.bot_num == bot_num,
                 BotTransaction.status == "pending"
             ).count()
             
-            processing = session.query(BotTransaction).filter(
-                BotTransaction.bot_num == bot_num,
-                BotTransaction.status == "processing"
-            ).count()
+            # Plus de statut "processing" - supprimé
+            processing = 0  # Toujours 0 maintenant
             
             success = session.query(BotTransaction).filter(
                 BotTransaction.bot_num == bot_num,
@@ -200,14 +171,14 @@ class BotPoller:
                 BotTransaction.status == "failed"
             ).count()
             
-            total = pending + processing + success + failed
+            total = pending + success + failed  # Plus de processing
             success_rate = (success / total * 100) if total > 0 else 0
             
             return {
                 "bot_num": bot_num,
                 "total_transactions": total,
                 "pending": pending,
-                "processing": processing,
+                "processing": processing,  # Toujours 0
                 "success": success,
                 "failed": failed,
                 "success_rate": round(success_rate, 2)

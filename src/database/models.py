@@ -10,7 +10,7 @@ Base = declarative_base()
 class BotTransaction(Base):
     """
     Modèle pour la table bots_transactions selon les spécifications Salla
-    Colonnes : id, bot_num, status, payload, bot_type
+    Colonnes : id, bot_num, status, payload, bot_type, failure_reason
     """
     __tablename__ = "bots_transactions"
     
@@ -19,6 +19,7 @@ class BotTransaction(Base):
     status = Column(String, default="pending")  # pending, success, failure
     payload = Column(JSON)  # JSON avec player_id, code, email, password
     bot_type = Column(String, nullable=False)
+    failure_reason = Column(String)  # wrong_player_id, wrong_code, wrong_item_type, wrong_amount, wrong_email_password, other
     
     # Contraintes de validation
     __table_args__ = (
@@ -40,6 +41,11 @@ class BotTransaction(Base):
         if self.payload and isinstance(self.payload, dict):
             return self.payload.get('code')
         return None
+    
+    def get_redeem_codes(self):
+        """Extraire les codes de rédemption du payload JSON (compatibilité)"""
+        code = self.get_code()
+        return [code] if code else []
     
     def get_email(self):
         """Extraire l'email du payload JSON"""

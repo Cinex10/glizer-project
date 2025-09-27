@@ -6,7 +6,8 @@ CREATE TABLE IF NOT EXISTS bots_transactions (
     bot_num INTEGER NOT NULL CHECK (bot_num >= 1 AND bot_num <= 10),
     status VARCHAR DEFAULT 'pending',
     payload JSONB,
-    bot_type VARCHAR NOT NULL CHECK (bot_type IN ('yalla_ludo', 'pubg'))
+    bot_type VARCHAR NOT NULL CHECK (bot_type IN ('yalla_ludo', 'pubg')),
+    failure_reason VARCHAR CHECK (failure_reason IN ('wrong_player_id', 'wrong_code', 'wrong_item_type', 'wrong_amount', 'wrong_email_password', 'other'))
 );
 
 -- Index pour améliorer les performances

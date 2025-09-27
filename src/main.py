@@ -1,5 +1,5 @@
 """
-Main FastAPI application - adapté pour PostgreSQL et bots 9 et 10
+Main FastAPI application - adapté pour PostgreSQL et tous les bots (1-10)
 """
 from contextlib import asynccontextmanager
 import asyncio
@@ -66,10 +66,10 @@ async def lifespan(app: FastAPI):
     transaction_processor = TransactionProcessor()
     logger.info("Transaction processor initialized")
     
-    # Start thread manager (2 workers for bots 9 and 10)
-    thread_manager = ThreadManager(max_workers=2)
+    # Start thread manager (10 workers for all bots 1-10)
+    thread_manager = ThreadManager(max_workers=10)
     thread_manager.start()
-    logger.info("Thread manager started successfully")
+    logger.info("Thread manager started successfully with 10 workers")
     
     yield
     
@@ -87,7 +87,7 @@ async def lifespan(app: FastAPI):
 # Create FastAPI app with lifespan
 app = FastAPI(
     title="Glizer Bot Processor API",
-    description="Automated PUBG UC recharge system for bots 9 and 10",
+    description="Automated PUBG UC recharge system for all bots (1-10)",
     version="2.0.0",
     lifespan=lifespan
 )
@@ -97,7 +97,7 @@ async def root():
     """Point d'entrée de l'API"""
     return {
         "message": "Glizer Bot Processor API v2.0",
-        "description": "Automated PUBG UC recharge system for bots 9 and 10",
+        "description": "Automated PUBG UC recharge system for all bots (1-10)",
         "status": "running"
     }
 
@@ -124,10 +124,7 @@ async def get_stats():
         
         return {
             "system_status": "running",
-            "bots": {
-                "bot_9": system_stats.get("bot_9", {}),
-                "bot_10": system_stats.get("bot_10", {})
-            },
+            "bots": system_stats.get("all_bots", {}),
             "totals": {
                 "pending": system_stats.get("total_pending", 0),
                 "processing": system_stats.get("total_processing", 0),
@@ -152,8 +149,8 @@ async def get_stats():
 async def get_bot_stats(bot_num: int):
     """Obtenir les statistiques d'un bot spécifique"""
     
-    if bot_num not in [9, 10]:
-        raise HTTPException(status_code=400, detail="Bot number must be 9 or 10")
+    if bot_num not in list(range(1, 11)):  # bots 1 à 10
+        raise HTTPException(status_code=400, detail="Bot number must be between 1 and 10")
     
     try:
         stats = transaction_processor.poller.get_bot_stats(bot_num)
@@ -169,19 +166,19 @@ async def list_transactions(
     status: Optional[str] = None,
     limit: int = 50
 ):
-    """Lister les transactions des bots 9 et 10"""
+    """Lister les transactions de tous les bots (1-10)"""
     
     db = get_postgres_session()
     try:
         query = db.query(BotTransaction).filter(
-            BotTransaction.bot_num.in_([9, 10]),
+            BotTransaction.bot_num.in_(list(range(1, 11))),  # bots 1 à 10
             BotTransaction.bot_type == "pubg"
         )
         
         # Filtres optionnels
         if bot_num is not None:
-            if bot_num not in [9, 10]:
-                raise HTTPException(status_code=400, detail="Bot number must be 9 or 10")
+            if bot_num not in list(range(1, 11)):  # bots 1 à 10
+                raise HTTPException(status_code=400, detail="Bot number must be between 1 and 10")
             query = query.filter(BotTransaction.bot_num == bot_num)
         
         if status is not None:
@@ -218,7 +215,7 @@ async def get_transaction_status(transaction_id: str):
     try:
         transaction = db.query(BotTransaction).filter(
             BotTransaction.id == transaction_id,
-            BotTransaction.bot_num.in_([9, 10])
+            BotTransaction.bot_num.in_(list(range(1, 11)))  # bots 1 à 10
         ).first()
         
         if not transaction:
@@ -293,15 +290,21 @@ async def check_credentials_status():
         return {
             "status": "ok",
             "rotation_status": {
-                "current_position": credential_stats["current_position"],
+                "current_position": credential_stats.get("current_position", 0),
                 "total_credentials": credential_stats["total_credentials"],
-                "rotation_progress": credential_stats["rotation_progress"],
+                "rotation_progress": credential_stats.get("rotation_progress", 0),
                 "next_credential": {
-                    "index": credential_stats["current_position"],
-                    "email": credential_stats["usage_stats"].get(str(credential_stats["current_position"]), {}).get("email", "unknown")
+                    "index": credential_stats.get("current_position", 0),
+                    "email": credential_stats["usage_stats"].get(str(credential_stats.get("current_position", 0)), {}).get("email", "unknown")
                 }
             },
-            "usage_stats": credential_stats["usage_stats"]
+            "usage_stats": credential_stats["usage_stats"],
+            "email_status": {
+                "active_emails": credential_stats.get("active_emails", []),
+                "active_emails_count": credential_stats.get("active_emails_count", 0),
+                "available_emails": credential_stats.get("available_emails", []),
+                "available_emails_count": credential_stats.get("available_emails_count", 0)
+            }
         }
         
     except Exception as e:
@@ -361,6 +364,80 @@ async def get_queue_status():
     except Exception as e:
         logger.error(f"Error getting queue status: {e}")
         raise HTTPException(status_code=500, detail="Failed to get queue status")
+
+@app.post("/queue/clear-processing")
+async def clear_processing_tracking():
+    """Nettoyer manuellement le tracking des transactions en cours (pour maintenance)"""
+    
+    try:
+        result = thread_manager.clear_processing_tracking()
+        
+        return {
+            "status": "ok",
+            "message": f"Cleared {result['cleared_count']} transactions from processing tracking",
+            "cleared_transaction_ids": result['cleared_transaction_ids']
+        }
+        
+    except Exception as e:
+        logger.error(f"Error clearing processing tracking: {e}")
+        raise HTTPException(status_code=500, detail="Failed to clear processing tracking")
+
+@app.get("/queue/processing/{transaction_id}")
+async def check_transaction_processing(transaction_id: str):
+    """Vérifier si une transaction est en cours de traitement"""
+    
+    try:
+        is_processing = thread_manager.is_transaction_processing(transaction_id)
+        
+        return {
+            "status": "ok",
+            "transaction_id": transaction_id,
+            "is_processing": is_processing
+        }
+        
+    except Exception as e:
+        logger.error(f"Error checking transaction processing status: {e}")
+        raise HTTPException(status_code=500, detail="Failed to check transaction processing status")
+
+@app.get("/emails/status")
+async def get_email_status():
+    """Obtenir le statut des emails (actifs, disponibles)"""
+    
+    try:
+        email_status = thread_manager.get_email_status()
+        
+        return {
+            "status": "ok",
+            "email_status": {
+                "active_emails": list(email_status["active_emails"]),
+                "available_emails": email_status["available_emails"],
+                "total_credentials": email_status["total_credentials"],
+                "active_count": email_status["active_count"],
+                "available_count": email_status["available_count"]
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting email status: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get email status")
+
+@app.post("/emails/release-all")
+async def force_release_all_emails():
+    """Forcer la libération de tous les emails actifs (pour maintenance)"""
+    
+    try:
+        result = thread_manager.force_release_all_emails()
+        
+        return {
+            "status": "ok",
+            "message": f"Released {result['released_count']} emails",
+            "released_emails": result["released_emails"],
+            "released_count": result["released_count"]
+        }
+        
+    except Exception as e:
+        logger.error(f"Error releasing emails: {e}")
+        raise HTTPException(status_code=500, detail="Failed to release emails")
 
 if __name__ == "__main__":
     import uvicorn

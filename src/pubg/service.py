@@ -15,6 +15,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 import random
 import logging
 import stat
+from services.credential_manager import CredentialManager
 
 
 COOKIES_XPATH='/html[1]/body[1]/div[2]/div[1]/div[11]/div[3]/div[1]/div[1]/div[1]'
@@ -71,11 +72,66 @@ REDEEM_SUCCESS_NOTICE_XPATH = "//div[contains(@class, 'PurchaseContainer_text_Om
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+def detect_failure_reason(error_message: str) -> str:
+    """
+    Détecter le type d'erreur basé sur l'ordre séquentiel de sortie du bot
+    
+    Args:
+        error_message: Message d'erreur à analyser
+        
+    Returns:
+        failure_reason: Type d'erreur détecté selon l'ordre séquentiel
+    """
+    if not error_message or not isinstance(error_message, str):
+        return "other"
+    
+    error_lower = error_message.lower()
+    
+    # MAPPAGE BASÉ SUR L'ORDRE SÉQUENTIEL DE SORTIE DU BOT :
+    
+    # 1. Sortie lors de l'initialisation du navigateur
+    if any(phrase in error_lower for phrase in ["browser initialization failed", "failed to initialize chrome driver"]):
+        return "other"
+    
+    # 2. Sortie lors de la visite de page
+    if any(phrase in error_lower for phrase in ["failed to navigate to page", "navigation failed"]):
+        return "other"
+    
+    # 3. Sortie lors de la connexion (3ème étape séquentielle)
+    if any(phrase in error_lower for phrase in ["failed to sign in", "sign in error", "login failed"]):
+        return "wrong_email_password"
+    
+    # 4. Sortie lors du changement de Player ID (4ème étape séquentielle)
+    if any(phrase in error_lower for phrase in ["player switch failed", "invalid player id", "player id"]):
+        return "wrong_player_id"
+    
+    # 5. Sortie lors de la rédemption de code (5ème étape séquentielle)
+    if any(phrase in error_lower for phrase in ["failed to redeem code", "redeem code error", "code error"]):
+        return "wrong_code"
+    
+    # 6. Sortie lors de la vérification du résultat (6ème étape séquentielle)
+    if any(phrase in error_lower for phrase in ["unknown redemption outcome", "redemption outcome", "check_redemption_outcome"]):
+        # Détecter les erreurs de quantité dans les messages d'erreur
+        if any(word in error_lower for word in ["limit", "exceeded", "maximum", "كمية", "quantity", "amount"]):
+            return "wrong_amount"
+        # Détecter les erreurs de type d'item
+        elif any(word in error_lower for word in ["item", "type", "category", "عنصر"]):
+            return "wrong_item_type"
+        else:
+            return "wrong_item_type"  # Par défaut pour les erreurs de résultat
+    
+    # Par défaut
+    return "other"
+
 class RedemptionError(Exception):
-    pass
+    def __init__(self, message, failure_reason="other"):
+        super().__init__(message)
+        self.failure_reason = failure_reason
 
 class PlayerSwitchError(Exception):
-    pass
+    def __init__(self, message, failure_reason="wrong_player_id"):
+        super().__init__(message)
+        self.failure_reason = failure_reason
 
 class Browser:
     def __init__(self, email: str) -> None:
@@ -463,8 +519,12 @@ class Browser:
         """Switch to specified player ID - GARDE EXACTEMENT LA LOGIQUE DE VOTRE CODE ACTUEL"""
         
         try:
-            if not str(player_id).isdigit():
+            # Validation basique du Player ID
+            player_id_str = str(player_id).strip()
+            if not player_id_str.isdigit():
                 raise Exception("Invalid Player ID")
+            
+            logger.info(f"Switching to Player ID: {player_id_str}")
 
             self.driver.switch_to.default_content()
             
@@ -474,12 +534,12 @@ class Browser:
                 logger.info(f"Current player ID found: {original_player_id}")
 
                 # Check if ID already matches
-                if str(player_id) == original_player_id:
+                if player_id_str == original_player_id:
                     logger.info("Player ID already matches target ID")
                     return
 
                 # If ID doesn't match, use the old service approach (switch icon method)
-                logger.info(f"Current ID '{original_player_id}' doesn't match target '{player_id}', using switch icon method...")
+                logger.info(f"Current ID '{original_player_id}' doesn't match target '{player_id_str}', using switch icon method...")
                 
                 # Use the old service approach with switch icon
                 switch_btn = WebDriverWait(self.driver, 8).until(
@@ -490,7 +550,7 @@ class Browser:
                 # Handle ID input using old service approach
                 id_input = WebDriverWait(self.driver, 8).until(
                     EC.element_to_be_clickable((By.XPATH, PLAYER_ID_INPUT_FIELD_XPATH)))
-                self.clear_and_type(id_input, str(player_id))
+                self.clear_and_type(id_input, player_id_str)
 
                 # Confirm change using old service approach
                 confirm_btn = WebDriverWait(self.driver, 8).until(
@@ -499,7 +559,7 @@ class Browser:
 
                 # Verify change
                 WebDriverWait(self.driver, 8).until(
-                    lambda d: self.get_current_player_id() == str(player_id))
+                    lambda d: self.get_current_player_id() == player_id_str)
                 logger.info("Player ID successfully changed using switch icon method")
                 return
                     
@@ -558,8 +618,8 @@ class Browser:
                 EC.presence_of_element_located((By.XPATH, "//input[@placeholder='إدخال حساب معرف لاعب']")))
             
             # Clear and type the new player ID
-            self.clear_and_type(id_input, str(player_id))
-            logger.info(f"Player ID '{player_id}' entered")
+            self.clear_and_type(id_input, player_id_str)
+            logger.info(f"Player ID '{player_id_str}' entered")
             
             # Step 3: Find and click the OK button
             logger.info("Looking for OK button...")
@@ -633,10 +693,10 @@ class Browser:
             try:
                 new_player_id = self.get_current_player_id()
                 if new_player_id is not None:
-                    if str(player_id) == new_player_id:
+                    if player_id_str == new_player_id:
                         logger.info("Player ID successfully changed and verified")
                     else:
-                        logger.warning(f"Player ID verification failed. Expected: {player_id}, Got: {new_player_id}")
+                        logger.warning(f"Player ID verification failed. Expected: {player_id_str}, Got: {new_player_id}")
                 else:
                     logger.info("Player ID change completed (verification not possible - no current ID display)")
             except Exception as e:
@@ -648,6 +708,7 @@ class Browser:
             screenshot_file = "screenshots/Player switch failed.png"
             self.driver.save_screenshot(screenshot_file)
             logger.info(f"Screenshot saved as: {screenshot_file}")
+            
             raise Exception(f"Player switch failed: {str(e)}")
 
     def redeem_code(self, redeem_code):
@@ -743,7 +804,11 @@ class Browser:
             return self.check_redemption_outcome()
 
         except Exception as e:
-            raise e
+            failure_reason = detect_failure_reason(str(e))
+            if "|" not in str(e):
+                raise Exception(f"{str(e)}|{failure_reason}")
+            else:
+                raise e
 
     def clear_and_type(self, element, text):
         """Clear field and type text ultra-fast"""
@@ -837,7 +902,7 @@ class Browser:
         except Exception as e:
             logger.warning(f"JavaScript fallback failed: {str(e)}")
         
-        raise RedemptionError("Could not find or click submit button")
+        raise Exception("Could not find or click submit button")
 
     def check_redemption_outcome(self):
         """Check and return redemption result - GARDE EXACTEMENT VOTRE LOGIQUE"""
@@ -1015,13 +1080,83 @@ def process_pubg_recharge(emailAddress, password, playerId, redeemCodes):
     finally:
         # Délai avant fermeture - ultra-rapide
         time.sleep(0.1)
+        # Toujours fermer le navigateur en production
         try:
             browser.driver.quit()
         except:
             pass
         return result
 
+def process_pubg_recharge_with_rotation(playerId, redeemCodes):
+    """
+    Nouvelle fonction qui utilise la rotation automatique des credentials
+    Compatible avec le système de gestion des credentials
+    """
+    # Initialiser le gestionnaire de credentials
+    credential_manager = CredentialManager()
+    
+    # Obtenir le prochain credential dans la rotation
+    credential, credential_index = credential_manager.get_next_credential()
+    email = credential['email']
+    password = credential['password']
+    cred_id = credential.get('id', credential_index)
+    
+    logger.info(f"🔄 Using rotated credential {cred_id} ({email}) for player {playerId}")
+    
+    try:
+        # Utiliser la fonction existante avec les credentials rotatifs
+        result = process_pubg_recharge(
+            emailAddress=email,
+            password=password,
+            playerId=playerId,
+            redeemCodes=redeemCodes
+        )
+        
+        # Analyser le résultat pour marquer le credential
+        success_count = sum(1 for status in result.values() if status is True)
+        total_codes = len(result)
+        
+        if success_count == total_codes:
+            # Succès complet
+            credential_manager.mark_credential_success(credential_index)
+            logger.info(f"✅ Credential {cred_id} marked as success ({success_count}/{total_codes} codes)")
+        elif success_count > 0:
+            # Succès partiel
+            credential_manager.mark_credential_success(credential_index)
+            logger.info(f"✅ Credential {cred_id} marked as partial success ({success_count}/{total_codes} codes)")
+        else:
+            # Échec complet
+            credential_manager.mark_credential_failed(credential_index)
+            logger.warning(f"❌ Credential {cred_id} marked as failed ({success_count}/{total_codes} codes)")
+        
+        return result
+        
+    except Exception as e:
+        # Marquer le credential comme échoué en cas d'exception
+        credential_manager.mark_credential_failed(credential_index)
+        logger.error(f"❌ Credential {cred_id} failed with exception: {str(e)}")
+        
+        # Détecter le type d'erreur et l'ajouter au message
+        failure_reason = detect_failure_reason(str(e))
+        if "|" not in str(e):  # Si le failure_reason n'est pas déjà dans le message
+            raise Exception(f"{str(e)}|{failure_reason}")
+        else:
+            raise
+
+
 # Garder le main pour les tests - EXACTEMENT COMME LE CODE DE RÉFÉRENCE
 if __name__ == "__main__":
+    # Test avec credentials hardcodés (ancien système) - navigateur fermé automatiquement
     r = process_pubg_recharge(emailAddress="Abdull82ah@hotmail.com", password="ZXCVzxcv@1010", playerId="533938203", redeemCodes=["gxNcMmj72s2a4eGfQ8"])   
-    print(r)
+    print("Test avec credentials hardcodés:", r)
+    
+    # Test avec navigateur fermé automatiquement
+    r_open = process_pubg_recharge(emailAddress="Abdull82ah@hotmail.com", password="ZXCVzxcv@1010", playerId="533938203", redeemCodes=["gxNcMmj72s2a4eGfQ8"])   
+    print("Test avec navigateur fermé:", r_open)
+    
+    # Test avec rotation automatique (nouveau système)
+    try:
+        r2 = process_pubg_recharge_with_rotation(playerId="533938203", redeemCodes=["gxNcMmj72s2a4eGfQ8"])
+        print("Test avec rotation automatique:", r2)
+    except Exception as e:
+        print(f"Erreur avec rotation automatique: {e}")
