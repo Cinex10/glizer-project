@@ -8,6 +8,11 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 import time
 import os
+import tempfile
+import shutil
+import glob
+import platform
+import stat
 from selenium.common.exceptions import TimeoutException, WebDriverException
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
@@ -136,20 +141,27 @@ class PlayerSwitchError(Exception):
 class Browser:
     def __init__(self, email: str) -> None:
         logger.info("init ##")
-        # GESTION SIMPLE COMME LE CODE DE RÉFÉRENCE
-        url = os.getcwd()
         
-        # Générer un identifiant unique pour chaque exécution
-        import time
-        import threading
-        unique_id = f"{int(time.time() * 1000)}_{threading.get_ident()}_{os.getpid()}"
-        self.user_data_dir = os.path.join(url, f'user-data-{email}-{unique_id}')
-        os.makedirs(self.user_data_dir, mode=0o700, exist_ok=True)
-        os.chmod(self.user_data_dir, stat.S_IRWXU)
+        # Utiliser un répertoire absolu au lieu de os.getcwd()
+        import tempfile
+        base_dir = tempfile.gettempdir()  # /tmp sur Linux
+        user_data = os.path.join(base_dir, f'chrome-user-data-{email}-{os.getpid()}-{int(time.time())}')
+        
+        # Nettoyer les anciens répertoires de cet email
+        import glob
+        old_dirs = glob.glob(f"{base_dir}/chrome-user-data-{email}-*")
+        for old_dir in old_dirs:
+            try:
+                shutil.rmtree(old_dir)
+            except:
+                pass
+        
+        os.makedirs(user_data, mode=0o755, exist_ok=True)  # Permissions plus larges
+        self.user_data_dir = user_data
         
         options = Options()
         options.page_load_strategy = 'normal'  # Comme le code de référence
-        options.add_argument(f"--user-data-dir={self.user_data_dir}")
+        options.add_argument(f"--user-data-dir={user_data}")
         
         # Ajouter quelques variations réalistes
         user_agents = [
@@ -158,23 +170,15 @@ class Browser:
         ]
         options.add_argument(f"--user-agent={random.choice(user_agents)}")
         
-        # Ubuntu server compatibility arguments - EXACTEMENT COMME LE CODE DE RÉFÉRENCE
-        # options.add_argument("--headless")  # Activé comme dans le code de référence
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--disable-gpu")
-        options.add_argument("--disable-extensions")
-        options.add_argument("--disable-plugins")
-        options.add_argument("--window-size=1920,1080")
-        options.add_argument("--disable-web-security")
-        options.add_argument("--disable-features=VizDisplayCompositor")
-        options.add_argument("--disable-background-timer-throttling")
-        options.add_argument("--disable-renderer-backgrounding")
-        options.add_argument("--lang=ar")
-        options.add_experimental_option("prefs", {
-            "intl.accept_languages": "ar,ar-SA,en-US,en"
-        })
-        options.add_argument("--start-maximized")
+        # Détecter si on est sur serveur
+        import platform
+        is_server = not os.environ.get('DISPLAY') or platform.system() == 'Linux'
+
+        if is_server:
+            options.add_argument("--headless")
+            options.add_argument("--disable-gpu")
+            options.add_argument("--no-sandbox")
+            options.add_argument("--disable-dev-shm-usage")
                 # Arguments spécifiques pour Docker - Solution 2
         options.add_argument("--disable-setuid-sandbox")
         options.add_argument("--disable-backgrounding-occluded-windows")
