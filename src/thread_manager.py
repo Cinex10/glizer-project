@@ -170,7 +170,7 @@ class ThreadManager:
         try:
             transactions = session.query(BotTransaction).filter(
                 BotTransaction.bot_num.in_(list(range(1, 11))),  # bots 1 à 10
-                BotTransaction.bot_type == "pubg",
+                BotTransaction.bot == "pubg",
                 BotTransaction.status == "pending"
             ).order_by(BotTransaction.id.asc()).all()
             

@@ -39,7 +39,7 @@ class BotPoller:
             # Récupérer les transactions PUBG de tous les bots (1-10) en attente uniquement
             transactions = session.query(BotTransaction).filter(
                 BotTransaction.bot_num.in_(list(range(1, 11))),  # bots 1 à 10
-                BotTransaction.bot_type == "pubg",
+                BotTransaction.bot == "pubg",
                 BotTransaction.status == "pending"  # Seulement pending, plus de processing
             ).order_by(BotTransaction.created_at.asc()).all()
             

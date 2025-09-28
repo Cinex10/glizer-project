@@ -172,7 +172,7 @@ async def list_transactions(
     try:
         query = db.query(BotTransaction).filter(
             BotTransaction.bot_num.in_(list(range(1, 11))),  # bots 1 à 10
-            BotTransaction.bot_type == "pubg"
+            BotTransaction.bot == "pubg"
         )
         
         # Filtres optionnels

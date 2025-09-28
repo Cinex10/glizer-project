@@ -1,45 +1,51 @@
 """
 Modèles adaptés pour la table bots_transactions PostgreSQL
-Architecture simplifiée selon les spécifications Salla
+Architecture adaptée à la structure réelle de la base de données
 """
-from sqlalchemy import Column, String, Integer, JSON, CheckConstraint
+from sqlalchemy import Column, String, Integer, JSON, DateTime, CheckConstraint
 from sqlalchemy.ext.declarative import declarative_base
+from datetime import datetime
 
 Base = declarative_base()
 
 class BotTransaction(Base):
     """
-    Modèle pour la table bots_transactions selon les spécifications Salla
-    Colonnes : id, bot_num, status, payload, bot_type, failure_reason
+    Modèle pour la table bots_transactions selon la structure réelle
+    Colonnes : id, bot, bot_num, status, payloads, f_u, created_at, updated_at, deleted_at, failure_reason, payload
     """
     __tablename__ = "bots_transactions"
     
     id = Column(String, primary_key=True)
+    bot = Column(String)  # Nouvelle colonne bot
     bot_num = Column(Integer, nullable=False)
     status = Column(String, default="pending")  # pending, success, failure
-    payload = Column(JSON)  # JSON avec player_id, code, email, password
-    bot_type = Column(String, nullable=False)
+    payloads = Column(JSON)  # JSON avec player_id, code, email, password (ancien payload)
+    f_u = Column(String)  # Nouvelle colonne f_u
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    deleted_at = Column(DateTime, nullable=True)
     failure_reason = Column(String)  # wrong_player_id, wrong_code, wrong_item_type, wrong_amount, wrong_email_password, other
+    payload = Column(JSON)  # Nouvelle colonne payload
     
     # Contraintes de validation
     __table_args__ = (
         CheckConstraint('bot_num >= 1 AND bot_num <= 10', name='check_bot_num_range'),
-        CheckConstraint("bot_type IN ('yalla_ludo', 'pubg')", name='check_bot_type_valid'),
+        CheckConstraint("bot IN ('yalla_ludo', 'pubg')", name='check_bot_valid'),
     )
     
     def __repr__(self):
-        return f"<BotTransaction(id={self.id}, bot_num={self.bot_num}, status={self.status}, bot_type={self.bot_type})>"
+        return f"<BotTransaction(id={self.id}, bot_num={self.bot_num}, status={self.status}, bot={self.bot})>"
     
     def get_player_id(self):
-        """Extraire le player_id du payload JSON"""
-        if self.payload and isinstance(self.payload, dict):
-            return self.payload.get('player_id')
+        """Extraire le player_id du payload JSON (utilise payloads)"""
+        if self.payloads and isinstance(self.payloads, dict):
+            return self.payloads.get('player_id')
         return None
     
     def get_code(self):
-        """Extraire le code de rédemption du payload JSON"""
-        if self.payload and isinstance(self.payload, dict):
-            return self.payload.get('code')
+        """Extraire le code de rédemption du payload JSON (utilise payloads)"""
+        if self.payloads and isinstance(self.payloads, dict):
+            return self.payloads.get('code')
         return None
     
     def get_redeem_codes(self):
@@ -48,24 +54,24 @@ class BotTransaction(Base):
         return [code] if code else []
     
     def get_email(self):
-        """Extraire l'email du payload JSON"""
-        if self.payload and isinstance(self.payload, dict):
-            return self.payload.get('email')
+        """Extraire l'email du payload JSON (utilise payloads)"""
+        if self.payloads and isinstance(self.payloads, dict):
+            return self.payloads.get('email')
         return None
     
     def get_password(self):
-        """Extraire le password du payload JSON"""
-        if self.payload and isinstance(self.payload, dict):
-            return self.payload.get('password')
+        """Extraire le password du payload JSON (utilise payloads)"""
+        if self.payloads and isinstance(self.payloads, dict):
+            return self.payloads.get('password')
         return None
     
     def is_pubg_bot(self):
-        """Vérifier si c'est un bot PUBG"""
-        return self.bot_type == "pubg"
+        """Vérifier si c'est un bot PUBG (utilise la colonne bot)"""
+        return self.bot == "pubg"
     
     def is_yalla_ludo_bot(self):
-        """Vérifier si c'est un bot Yalla Ludo"""
-        return self.bot_type == "yalla_ludo"
+        """Vérifier si c'est un bot Yalla Ludo (utilise la colonne bot)"""
+        return self.bot == "yalla_ludo"
     
     def is_pending(self):
         """Vérifier si la transaction est en attente"""
