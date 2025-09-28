@@ -138,13 +138,18 @@ class Browser:
         logger.info("init ##")
         # GESTION SIMPLE COMME LE CODE DE RÉFÉRENCE
         url = os.getcwd()
-        user_data = os.path.join(url, f'user-data-{email}')
-        os.makedirs(user_data, mode=0o700, exist_ok=True)
-        os.chmod(user_data, stat.S_IRWXU)
+        
+        # Générer un identifiant unique pour chaque exécution
+        import time
+        import threading
+        unique_id = f"{int(time.time() * 1000)}_{threading.get_ident()}_{os.getpid()}"
+        self.user_data_dir = os.path.join(url, f'user-data-{email}-{unique_id}')
+        os.makedirs(self.user_data_dir, mode=0o700, exist_ok=True)
+        os.chmod(self.user_data_dir, stat.S_IRWXU)
         
         options = Options()
         options.page_load_strategy = 'normal'  # Comme le code de référence
-        options.add_argument(f"--user-data-dir={user_data}")
+        options.add_argument(f"--user-data-dir={self.user_data_dir}")
         
         # Ajouter quelques variations réalistes
         user_agents = [
@@ -1019,6 +1024,26 @@ class Browser:
             scroll_amount = random.randint(150, 300)
             scroll_pause_time = random.uniform(0.05, 0.15)
     
+    def cleanup(self):
+        """Nettoyer le répertoire user data et fermer le driver"""
+        try:
+            if hasattr(self, 'driver') and self.driver:
+                self.driver.quit()
+                logger.info("Browser driver closed successfully")
+        except Exception as e:
+            logger.warning(f"Error closing driver: {e}")
+        
+        try:
+            if hasattr(self, 'user_data_dir') and os.path.exists(self.user_data_dir):
+                import shutil
+                shutil.rmtree(self.user_data_dir, ignore_errors=True)
+                logger.info(f"Cleaned up user data directory: {self.user_data_dir}")
+        except Exception as e:
+            logger.warning(f"Error cleaning up user data directory: {e}")
+    
+    def __del__(self):
+        """Destructeur pour nettoyer automatiquement"""
+        self.cleanup()
 
 def process_pubg_recharge(emailAddress, password, playerId, redeemCodes):
     # GESTION SIMPLE EXACTEMENT COMME LE CODE DE RÉFÉRENCE
@@ -1080,11 +1105,11 @@ def process_pubg_recharge(emailAddress, password, playerId, redeemCodes):
     finally:
         # Délai avant fermeture - ultra-rapide
         time.sleep(0.1)
-        # Toujours fermer le navigateur en production
+        # Nettoyer le browser et ses données temporaires
         try:
-            browser.driver.quit()
-        except:
-            pass
+            browser.cleanup()
+        except Exception as e:
+            logger.warning(f"Error during cleanup: {e}")
         return result
 
 def process_pubg_recharge_with_rotation(playerId, redeemCodes):
